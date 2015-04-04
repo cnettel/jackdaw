@@ -544,7 +544,7 @@ fread(buffer, sizeof(int), poses.size() * 160, in);
 
 
 int SIDE = 256;
-int SHORT_SIDE = 12;
+int SHORT_SIDE = 24;
 
 #include <cufft.h>
 #include <thrust/device_vector.h>
@@ -566,16 +566,20 @@ struct likelihoodgetter
 double __device__ likelihood(int count, int mask, cufftComplex val)
 {	
 	if (!mask) return 0;
-	double val2 = val.x * val.x + val.y * val.y;
+	double val2 = /*val.x * val.x + val.y * val.y*/ val.x;
 	double term = 0;
-/*	if (val2 < 1e-9)
+	if (val2 < 0)
 	{
-		term = -val.x * val.x;val2 = 1e-9;
+		term = /*-val.x * val.x;val2 = 1e-9*/ -1e9 + val2;
 	}
-	else*/
+	else
 	{
 		term += log(val2) * count - val2;
 	}
+	term -= fabs(val.y) * 1;
+	term -= 34154;
+
+	
 
 //	term -= val.y * val.y;
 	return term;
@@ -671,14 +675,14 @@ int main(int argc, char** argv)
 		}
 	}
 
-	double temperatureFactor = 10000000;
+	double temperatureFactor = /*10000000*/ 1e-7;
 	while (true)
 {
 	if (iter % 100 == 99)
 	{
-		if (forced < chosen * 1.05 || chosen + forced > skips * 5) temperatureFactor /= pow(10, 1.0/5);
+/*		if (forced < chosen * 1.05 || chosen + forced > skips * 5) temperatureFactor /= pow(10, 1.0/5);
 		else
-			temperatureFactor *= pow(10, 1.0/5);
+			temperatureFactor *= pow(10, 1.0/5);*/
 		printf("Outer iteration %d %lf %d %d\t%lf\n", iter, oldLikelihood, forced, chosen, log(temperatureFactor)/log(10));
 		fflush(stdout);
 		forced = 0;
@@ -686,7 +690,7 @@ int main(int argc, char** argv)
 		skips = 0;
 	}
 	iter++;
-			if (temperatureFactor < 1) temperatureFactor = 1;
+			if (temperatureFactor < 1e-7) temperatureFactor = 1e-7;
 	for (int y = 0; y < SHORT_SIDE; y++)
 	{
 		for (int x = 0; x < SHORT_SIDE; x++)
@@ -770,12 +774,17 @@ else
 
 
 //			cudaMemcpy(&d_data[index], &data[index], sizeof(cufftComplex), cudaMemcpyHostToDevice);
-			cudaMemcpy(d_data, data, sizeof(cufftComplex) * SIDE * SHORT_SIDE, cudaMemcpyHostToDevice);
+//			cudaMemcpy(d_data, data, sizeof(cufftComplex) * SIDE * SHORT_SIDE, cudaMemcpyHostToDevice);
+			cudaMemcpy2D(d_data, sizeof(cufftComplex) * SIDE, data, sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+			cudaMemcpy2D(&d_data[SIDE - SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+
+			cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * SIDE], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+			cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * (SIDE + 1)], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE + SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
 
 			cufftExecC2C(plan, d_data, d_pattern, CUFFT_FORWARD);
 			double newLikelihood = thrust::transform_reduce(thrust::make_zip_iterator(thrust::make_tuple(t_truePattern, t_mask, t_pattern)),
                                          thrust::make_zip_iterator(thrust::make_tuple(&t_truePattern[SIDE * SIDE], &t_mask[SIDE * SIDE], &t_pattern[SIDE * SIDE])), likelihooder,
-					 (double) 0, thrust::plus<double>()) + 34154. * SIDE * SIDE;
+					 (double) 0, thrust::plus<double>()) + 34154. * 2 * SIDE * SIDE;
 			if (newLikelihood > oldLikelihood)
 			{
 //				printf("FORCED ACCEPT: x: %d, y: %d - %f at %lf : %f %lf %lf %d\n", x, y, val, angle, newLikelihood, nowsum, nowsum - basesum + basesum * factor * factor, iter);
@@ -807,13 +816,19 @@ else
 //			printf("SKIP: x: %d, y: %d - %f at %f : %lf %lf\n", x, y, val, angle, newLikelihood, log(alpha));
 			data[otherindex] = otherold;
 			data[index] = old;
-			cudaMemcpy(&d_data[index], &data[index], sizeof(cufftComplex), cudaMemcpyHostToDevice);
+			cudaMemcpy2D(d_data, sizeof(cufftComplex) * SIDE, data, sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+			cudaMemcpy2D(&d_data[SIDE - SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+
+			cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * SIDE], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+			cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * (SIDE + 1)], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE + SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
+			
+//			cudaMemcpy(&d_data[index], &data[index], sizeof(cufftComplex), cudaMemcpyHostToDevice);
                 }                 
 	}
 	if (iter % 10000 == 0)
 {
 	char tlf[255];
-	sprintf(tlf, "iterZ_%05d_%05d", seed,iter);
+	sprintf(tlf, "iter1a_%05d_%05d", seed,iter);
 	FILE* ut = fopen(tlf, "w");
 	for (int y = 0; y < SIDE; y++)
 {
