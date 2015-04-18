@@ -83,13 +83,41 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), myspherer));
 
   float intensityfactor = (psum - lsum * myspherer.lfactor) / intensity;
-  if (intensityfactor < 1e-9) intensityfactor = 1e-9;
+  if (intensityfactor < 1e-9)
+{
+target[idx] = -1e10;
+intens[idx] = 0;
+}
   likelihood likelihooder(myspherer, intensityfactor);
-  float likelihood = thrust::reduce(thrust::seq,
+  float likelihood1 = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
-  target[idx] = likelihood;
-  intens[idx] = intensityfactor;
+  likelihooder.factor = intensityfactor * 1.01;
+  float likelihood2 = thrust::reduce(thrust::seq,
+				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
+				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
+
+  float dir = 1.01;
+  if (likelihood2 < likelihood1)
+  {
+    dir = 0.99;
+    likelihooder.factor = intensityfactor;
+    likelihood2 = likelihood1;
+  }
+
+  int steps = 0;
+  do    
+  {
+    likelihood1 = likelihood2;
+    likelihooder.factor *= dir;
+    likelihood2 = thrust::reduce(thrust::seq,
+				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
+				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
+    steps++;
+  } while (likelihood2 > likelihood1 && steps < 10);
+
+  target[idx] = likelihood1;
+  intens[idx] = likelihooder.factor / dir + steps * 1000;
 }
 
 int main()
