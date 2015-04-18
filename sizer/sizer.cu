@@ -74,7 +74,7 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
 {
   myspherer.r = exp(myspherer.roffset + (threadIdx.z + blockIdx.z * blockDim.z) * myspherer.rfactor);
   myspherer.offsetx = (threadIdx.x + blockIdx.x * blockDim.x) + myspherer.baseoffsetx;
-  myspherer.offsety = (blockIdx.y + myspherer.baseoffsety);
+  myspherer.offsety = /*(blockIdx.y +*/ myspherer.baseoffsety/*)*/;
   myspherer.lfactor = 1.0 / sqrt(lsum) * threadIdx.y + 1.0;
 
   int idx =  (threadIdx.x + blockIdx.x * blockDim.x)  + (threadIdx.y + blockIdx.y * blockDim.y) * gridDim.x * blockDim.x + (threadIdx.z + blockIdx.z * blockDim.z)  * gridDim.x * blockDim.x * gridDim.y * blockDim.y;
@@ -88,36 +88,14 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
 target[idx] = -1e10;
 intens[idx] = 0;
 }
+  intensityfactor *= pow(1.01, blockIdx.y - gridDim.y * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
   float likelihood1 = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
-  likelihooder.factor = intensityfactor * 1.01;
-  float likelihood2 = thrust::reduce(thrust::seq,
-				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
-				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
-
-  float dir = 1.01;
-  if (likelihood2 < likelihood1)
-  {
-    dir = 0.99;
-    likelihooder.factor = intensityfactor;
-    likelihood2 = likelihood1;
-  }
-
-  int steps = 0;
-  do    
-  {
-    likelihood1 = likelihood2;
-    likelihooder.factor *= dir;
-    likelihood2 = thrust::reduce(thrust::seq,
-				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
-				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
-    steps++;
-  } while (likelihood2 > likelihood1 && steps < 10);
 
   target[idx] = likelihood1;
-  intens[idx] = likelihooder.factor / dir + steps * 1000;
+  intens[idx] = likelihooder.factor;
 }
 
 int main()
@@ -172,13 +150,13 @@ int main()
 	    }
 	}
       
-      dim3 grid(25, 40, 24);
-      dim3 block(2, 1, 50);
+      dim3 grid(1, 400, 24);
+      dim3 block(1, 7, 50);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 30 - 0.5;
-      spherer.baseoffsety = NY / 2 - 10 - 0.5;
+      spherer.baseoffsetx = NX / 2 + 70 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 70 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
@@ -200,9 +178,9 @@ float maxval = -1e30;
 	}
 	if (hIntensity[k] < minval) minval = hIntensity[k];
 }
-	int maxR = maxidx / 40 / 50;
-	int maxX = maxidx % 50;
-	int maxY = (maxidx / 50) % 40;
+	int maxR = maxidx / 2800 / 1;
+	int maxX = maxidx % 7;
+	int maxY = (maxidx / 7) % 400;
 
       printf("%d %d %lf %g %g %g %d %d %d %d %g\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint);
       fflush(stdout);
