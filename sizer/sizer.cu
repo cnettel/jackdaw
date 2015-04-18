@@ -70,7 +70,7 @@ __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(sph
 };
 
 
-__global__ void computeintensity(float* target, idealsphere myspherer, float psum, float lsum)
+__global__ void computeintensity(float* target, float* intens, idealsphere myspherer, float psum, float lsum)
 {
   myspherer.r = exp(myspherer.roffset + (threadIdx.z + blockIdx.z * blockDim.z) * myspherer.rfactor);
   myspherer.offsetx = (threadIdx.x + blockIdx.x * blockDim.x) + myspherer.baseoffsetx;
@@ -89,6 +89,7 @@ __global__ void computeintensity(float* target, idealsphere myspherer, float psu
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
   target[idx] = likelihood;
+  intens[idx] = intensityfactor;
 }
 
 int main()
@@ -114,6 +115,8 @@ int main()
   thrust::device_vector<float> dLambdas(NY * NX);
   thrust::device_vector<float> dIntensity(50 * 300 * 1200);
   thrust::host_vector<float> hIntensity(50 * 300 * 1200);
+  thrust::device_vector<float> dIntensity2(50 * 300 * 1200);
+  thrust::host_vector<float> hIntensity2(50 * 300 * 1200);
 
   idealsphere spherer(dPhotons, dLambdas);
 
@@ -142,7 +145,7 @@ int main()
 	}
       
       dim3 grid(25, 40, 24);
-      dim3 block(2, 7, 50);
+      dim3 block(2, 1, 50);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
@@ -151,26 +154,29 @@ int main()
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
-      computeintensity<<<grid, block>>>(dIntensity.data().get(), spherer, psum, lsum);
+      computeintensity<<<grid, block>>>(dIntensity.data().get(), dIntensity2.data().get(), spherer, psum, lsum);
       hIntensity.assign(dIntensity.begin(), dIntensity.end());
+      hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
 
       float minval = 1e30;
 float maxval = -1e30;
       int maxidx = 0;
-      for (int k = 0; k < 280 * 50 * 1200; k++)
+      float maxint = 0;
+      for (int k = 0; k < 40 * 50 * 1200; k++)
 {
 	if (hIntensity[k] > maxval)
 	{
 		maxval = hIntensity[k];
+		maxint = hIntensity2[k];
 		maxidx = k;
 	}
 	if (hIntensity[k] < minval) minval = hIntensity[k];
 }
-	int maxR = maxidx / 280 / 50;
+	int maxR = maxidx / 40 / 50;
 	int maxX = maxidx % 50;
-	int maxY = (maxidx / 50) % 280;
+	int maxY = (maxidx / 50) % 40;
 
-      printf("%d %d %lf %g %g %g %d %d %d %d\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError());
+      printf("%d %d %lf %g %g %g %d %d %d %d %g\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint);
       fflush(stdout);
     }
 }
