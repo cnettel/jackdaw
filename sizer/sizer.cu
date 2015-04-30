@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <boost/multi_array.hpp>
 #include <H5Cpp.h>
@@ -73,9 +72,10 @@ __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(sph
 __global__ void computeintensity(float* target, float* intens, idealsphere myspherer, float psum, float lsum)
 {
   myspherer.r = exp(myspherer.roffset + (threadIdx.z + blockIdx.z * blockDim.z) * myspherer.rfactor);
-  myspherer.offsetx = (threadIdx.x + blockIdx.x * blockDim.x) + myspherer.baseoffsetx;
-  myspherer.offsety = /*(blockIdx.y +*/ myspherer.baseoffsety/*)*/;
-  myspherer.lfactor = 1.0 / sqrt(lsum) * threadIdx.y + 1.0;
+  myspherer.offsetx = (threadIdx.x) * 3 + myspherer.baseoffsetx;
+  myspherer.offsety = (threadIdx.y * 3 + myspherer.baseoffsety);
+  myspherer.lfactor = 1.0 / sqrt(lsum) * (((int) blockIdx.x)) + 1.0;
+//    myspherer.lfactor = 1.0;
 
   int idx =  (threadIdx.x + blockIdx.x * blockDim.x)  + (threadIdx.y + blockIdx.y * blockDim.y) * gridDim.x * blockDim.x + (threadIdx.z + blockIdx.z * blockDim.z)  * gridDim.x * blockDim.x * gridDim.y * blockDim.y;
   float intensity = thrust::reduce(thrust::seq,
@@ -83,10 +83,11 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), myspherer));
 
   float intensityfactor = (psum - lsum * myspherer.lfactor) / intensity;
-  if (intensityfactor < 1e-9)
+  if (intensityfactor < 1e-6)
 {
-target[idx] = -1e10;
-intens[idx] = 0;
+/*target[idx] = -1e10;
+intens[idx] = 0;*/
+intensityfactor = 1e-6;
 }
   intensityfactor *= pow(1.01, blockIdx.y - gridDim.y * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
@@ -100,12 +101,16 @@ intens[idx] = 0;
 
 int main()
 {
-  //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/Background_RNA/HITS_RNApol/ToFhits.h5", H5F_ACC_RDONLY);
-  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/Background_RNA/HITS_RNApol/Hits.h5", H5F_ACC_RDONLY);
+//    H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/Background_RNA/HITS_RNApol/ToFhits.h5", H5F_ACC_RDONLY);
+//  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_MS2/ALL_runsRNApol_differentGainmapAndMask/HITS354/HITS.h5", H5F_ACC_RDONLY);
+//H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_MS2/ALL_runsMS2/HITS_MS2/HITS.h5", H5F_ACC_RDONLY);
+//H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_MS2/ALL_runsTBSV/HITS_TBSV/HITS.h5", H5F_ACC_RDONLY);
+H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/BackgroundProva/HITS_RNApol/Hits.h5", H5F_ACC_RDONLY);
+//  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/12nm_SIM/HITS/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/20sizes_RNA/forCARL_PDB/HITS_PDB.h5", H5F_ACC_RDONLY);
   H5::Group group = file.openGroup("with_geometry");
   H5::DataSet lambdas = group.openDataSet("lambdas");
-  H5::DataSet photons = group.openDataSet("ph_count");
+  H5::DataSet photons = group.openDataSet("photon_count");
   H5::DataSpace lambdaSpace = lambdas.getSpace();
   H5::DataSpace photonSpace = photons.getSpace();
   
@@ -119,10 +124,10 @@ int main()
   boost::multi_array<short, 2> photonVals(extents[NY][NX]);
   thrust::device_vector<short> dPhotons(NY * NX);
   thrust::device_vector<float> dLambdas(NY * NX);
-  thrust::device_vector<float> dIntensity(50 * 300 * 1200);
-  thrust::host_vector<float> hIntensity(50 * 300 * 1200);
-  thrust::device_vector<float> dIntensity2(50 * 300 * 1200);
-  thrust::host_vector<float> hIntensity2(50 * 300 * 1200);
+  thrust::device_vector<float> dIntensity(175000000);
+  thrust::host_vector<float> hIntensity(175000000);
+  thrust::device_vector<float> dIntensity2(175000000);
+  thrust::host_vector<float> hIntensity2(175000000);
 
   idealsphere spherer(dPhotons, dLambdas);
 
@@ -140,7 +145,8 @@ int main()
 	{
 	  for (int x = 0; x < NX; x++)
 	    {
-	      if ((y > 195 && y < 231) || y < 36 || ((x < 250 /* || (x < 300 && (y > 124 && y < 331))*/ ) && y > 55))
+	      if (((y > 195 && y < 231) || y < 36 || ((x < 255  || (x < 300 && (y > 124 && y < 325))) && (y > 92 || x > 170 || x < 90)) && !(x<55 && y > 374))
+	      || y < 105 || y > 343)
 	      {
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
@@ -150,13 +156,13 @@ int main()
 	    }
 	}
       
-      dim3 grid(1, 400, 24);
-      dim3 block(1, 7, 50);
+      dim3 grid(1, 50, 1200);
+      dim3 block(32, 32, 1);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 + 70 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 70 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 51 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 51 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
@@ -168,7 +174,7 @@ int main()
 float maxval = -1e30;
       int maxidx = 0;
       float maxint = 0;
-      for (int k = 0; k < 40 * 50 * 1200; k++)
+      for (int k = 0; k < grid.y * block.y * grid.x * block.x * grid.z * block.z; k++)
 {
 	if (hIntensity[k] > maxval)
 	{
@@ -178,11 +184,13 @@ float maxval = -1e30;
 	}
 	if (hIntensity[k] < minval) minval = hIntensity[k];
 }
-	int maxR = maxidx / 2800 / 1;
-	int maxX = maxidx % 7;
-	int maxY = (maxidx / 7) % 400;
+	int maxR = maxidx / grid.y / block.y / grid.x / block.x;
+	int maxX = maxidx % block.x;
+	int maxY = (maxidx / (grid.x * block.x)) % block.y;
+	int maxI = (maxidx / (block.x * grid.x * block.y)) % grid.y;
+	int maxI2 = (maxidx / block.x) % grid.x;
 
-      printf("%d %d %lf %g %g %g %d %d %d %d %g\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint);
+      printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint, maxI, maxI2);
       fflush(stdout);
     }
 }
