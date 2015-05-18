@@ -37,27 +37,30 @@ using namespace dlib;
 #include <boost/random/variate_generator.hpp>
 #include <boost/random/mersenne_twister.hpp>
 
+double factor = 1;
 
 struct likelihoodgetter
 {
+double factor;
+
 double __device__ likelihood(int count, int mask, cufftComplex val)
 {	
 	if (!mask) return 0;
 	double val2 = /*val.x * val.x + val.y * val.y*/ val.x;
 	double term = 0;
-	if (val2 <= 1e-10)
+	/*if (val2 <= 1e-10)
 	{
-		term = /*-val.x * val.x;val2 = 1e-9*/ -1e9 + val2 * 1e9;
+		term += val2 * factor;
+		val2 = 1e-10;
 	}
-	else
-	{
-		term += log(val2) * count - val2;
-	}
+	term += log(val2) * count - val2;*/
+	term -= (val2 - count) * (val2 - count);	
 	term -= fabs(val.y) * 1;
 
 	
 
 //	term -= val.y * val.y;
+//	term -= 34154;
 	return term;
 }
 
@@ -117,18 +120,23 @@ struct evaluator
 		 column_vector::const_iterator i = shortData.begin();
 		 column_vector::const_iterator iorig = i;
 		 double sum = 0;
+
+		 for (; i - iorig != elem_count; i++) {
+		     sum += (*i) * (*i);
+		 }
+		 sum /= sqrt(sum);
+		 sum *= fabs(iorig[elem_count]) * 1e-5;
+		 i = shortData.begin();	
 		 for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
 		 {
 			for (int x = 0; x < SHORT_SIDE; x++)
 			{
-				sum += fabs(*i);
-				data[y * SIDE + x].x = *(i);
-				data[(SIDE * (SHORT_SIDE - y - 1)) + SHORT_SIDE - x - 1].x = *(i);
+				data[y * SIDE + x].x = *(i) / sum;
+				data[(SIDE * (SHORT_SIDE - y - 1)) + SHORT_SIDE - x - 1].x = *(i) / sum;
 				i++;
 
-				data[y * SIDE + x].y = *(i);
-				data[(SIDE * (SHORT_SIDE - y - 1)) + SHORT_SIDE - x - 1].y = -*(i);
-				sum += fabs(*i);
+				data[y * SIDE + x].y = *(i) / sum;
+				data[(SIDE * (SHORT_SIDE - y - 1)) + SHORT_SIDE - x - 1].y = -*(i) / sum;
 				i++;
 				if (i - iorig >= elem_count) goto end;
 			}
@@ -148,7 +156,7 @@ end:;
 		double val = thrust::transform_reduce(thrust::make_zip_iterator(thrust::make_tuple(t_truePattern, t_mask, t_pattern)),
                                          thrust::make_zip_iterator(thrust::make_tuple(&t_truePattern[SIDE * SIDE], &t_mask[SIDE * SIDE], &t_pattern[SIDE * SIDE])), likelihooder,
 					 (double) 0, thrust::plus<double>()) /*+ 34154. * SIDE * SIDE*/;
-		printf("VAL %le %le\n", sum, val);
+		printf("VAL %le %le %le\n", sum, val, iorig[elem_count]);
 		static int count = 0;
 		count++;
 		if (!(count & 255)) fflush(stdout);
@@ -236,7 +244,8 @@ evaluator eval;
 	int chosen = 0;
 	int skips = 0;
 	column_vector guess;
-	guess.set_size(elem_count, 1);
+	guess.set_size(elem_count + 1, 1);
+	guess(elem_count) = 1;
 	for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
 	{
 		for (int x = 0; x < SHORT_SIDE; x++)
@@ -249,24 +258,56 @@ evaluator eval;
 
 //			guess((y * SHORT_SIDE + x) * 2) = val * cos(angle);
 //			guess((y * SHORT_SIDE + x) * 2 + 1) = val * sin(angle);
-			guess((y * SHORT_SIDE + x) * 2) = 0.1;
+			double r = y - SHORT_SIDE / 2 - SHORT_SIDE % 2;
+			r *= r;
+			double x2 = x - SHORT_SIDE / 2 - SHORT_SIDE % 2;
+			x2 *= x2;
+			r += x2;
+			guess((y * SHORT_SIDE + x) * 2) = 1 * exp(-r);
 			guess((y * SHORT_SIDE + x) * 2 + 1) = 0.0;
 		}
 	}
 end:;
 
-        printf("Maximum: %lf\n", find_min_bobyqa(eval, guess, 2 * SHORT_SIDE * SHORT_SIDE + 10, uniform_matrix<double>(elem_count,1,-500), uniform_matrix<double>(elem_count,1, 500),
-			 	 	10, 1e-2, 1e6));
+/*        printf("Maximum: %lf\n", find_min_bobyqa(eval, guess, 2 * SHORT_SIDE * SHORT_SIDE + 10, uniform_matrix<double>(elem_count + 1,1,-25000), uniform_matrix<double>(elem_count + 1,1, 25000),
+			 	 	10000, 1e-2, 1e6));*/
 
 	
-        printf("Maximum: %lf\n", find_min_using_approximate_derivatives(cg_search_strategy(),
-                                               objective_delta_stop_strategy(1e-7).be_verbose(),
-                                               eval, guess, 1e30));
+/*        printf("Maximum: %lf\n", find_min_using_approximate_derivatives(cg_search_strategy(),
+                                               gradient_norm_stop_strategy(1e-7).be_verbose(),
+                                               eval, guess, -1e30));*/
+
+	for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
+	{
+		for (int x = 0; x < SHORT_SIDE; x++)
+		{
+			int index = y * SIDE + x;
+			if ((y * SHORT_SIDE + x) * 2 >= elem_count) goto end2;
+			float angle = randval(0, M_PI * 2);
+			float val = randval(1e-10, 15);
+			//cufftComplex old = data[index];
+
+//			guess((y * SHORT_SIDE + x) * 2) = val * cos(angle);
+//			guess((y * SHORT_SIDE + x) * 2 + 1) = val * sin(angle);
+			double r = y - SHORT_SIDE / 2 - SHORT_SIDE % 2;
+			r *= r;
+			double x2 = x - SHORT_SIDE / 2 - SHORT_SIDE % 2;
+			x2 *= x2;
+			r += x2;
+			guess((y * SHORT_SIDE + x) * 2) = 1 * exp(-r);
+			guess((y * SHORT_SIDE + x) * 2 + 1) = 0.0;
+		}
+	}
+end2:;
 
 
-        printf("Maximum: %lf\n", find_min_using_approximate_derivatives(bfgs_search_strategy(),
-                                               objective_delta_stop_strategy(1e-7).be_verbose(),
-                                               eval, guess, 1e30));
+	for (; factor < 1e9; factor *= 2)
+{
+	likelihooder.factor = factor;	
+        printf("Maximum: %lf %lf\n", find_min_using_approximate_derivatives(cg_search_strategy(),
+                                               objective_delta_stop_strategy(1e-7, 2000).be_verbose(),
+                                               eval, guess, -1e30), factor);
+}
 
 
 /*        printf("Maximum: %lf\n", find_min_using_approximate_derivatives(newton_search_strategy(),
