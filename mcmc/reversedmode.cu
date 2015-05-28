@@ -13,11 +13,11 @@ using namespace std;
 #define __int32 int
 
 // Total side of pattern
-int SIDE = 256;
+const int SIDE = 256;
 // Side of non-zero rect in real/autocorrelation space
 // (definition dependent on the problem we are solving)
-int SHORT_SIDE = 25;
-int elem_count = 2 * (SHORT_SIDE * SHORT_SIDE / 2 + SHORT_SIDE % 2);
+const int SHORT_SIDE = 25;
+const int elem_count = SIDE * SIDE;
 
 #include <cufft.h>
 #include <thrust/device_vector.h>
@@ -57,8 +57,8 @@ double __device__ likelihood(int count, int mask, cufftComplex val)
 		term += (val2 - lim) * factor;
 		val2 = lim;
 	}
-	//term -= log(val2) * count - val2;
-	term -= (val2 - count) * (val2 - count);	
+	term += log(val2) * count - val2;
+	//term -= (val2 - count) * (val2 - count);	
 	term -= fabs(val.y) * 1;
 
 	
@@ -93,6 +93,23 @@ double __device__ operator ()(thrust::tuple<int, int, cufftComplex> t)
 return -likelihood(thrust::get<0>(t), thrust::get<1>(t), thrust::get<2>(t));
 }
 } likelihooder;
+
+struct supportpenalty
+{
+double factor;
+
+  double __device__ operator ()(thrust::tuple<int, cufftComplex> val)
+{
+  int x = thrust::get<0>(val) % SIDE;
+  int y = thrust::get<0>(val) / SIDE;
+  if (!((x < SHORT_SIDE / 2 || x >= SIDE - SHORT_SIDE / 2 - (SHORT_SIDE % 2)) &&
+      (y < SHORT_SIDE / 2 || y >= SIDE - SHORT_SIDE / 2 - (SHORT_SIDE % 2)))) {
+    cufftComplex input = thrust::get<1>(val);
+    return factor * (input.x * input.x + input.y * input.y);
+  }
+  return 0;
+}
+} supportpenalizer;
 
 struct gradientgetter {
   double __device__ gradient(int count, int mask, cufftComplex val, cufftComplex gTempl)
@@ -131,6 +148,7 @@ struct evaluator
   thrust::device_ptr<int> t_mask;
   thrust::device_ptr<int> t_truePattern;
   thrust::device_ptr<cufftComplex> t_pattern;
+  thrust::device_ptr<cufftComplex> t_data;
 
 	evaluator()
 	{
@@ -143,6 +161,7 @@ struct evaluator
 		t_mask = thrust::device_pointer_cast(d_mask);
 		t_truePattern = thrust::device_pointer_cast(d_truePattern);
 		t_pattern = thrust::device_pointer_cast(d_pattern);
+		t_data = thrust::device_pointer_cast(d_data);
 
 		printf("Memset: %d\n", cudaMemset(d_data, 0, sizeof(cufftComplex) * SIDE * SIDE));
 		cufftPlan2d(&plan, SIDE, SIDE, CUFFT_Z2Z);
@@ -161,28 +180,23 @@ struct evaluator
 		 sum *= fabs(iorig[elem_count]) * 1e-5;*/
 		 sum = 1;
 		 i = shortData.begin();	
-		 for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
+		 for (int y = 0; y < SIDE; y++)
 		 {
-			for (int x = 0; x < SHORT_SIDE; x++)
+			for (int x = 0; x < SIDE; x++)
 			{
-				data[y * SIDE + x].x = *(i) / sum;
-				data[(SIDE * (SHORT_SIDE - y - 1)) + SHORT_SIDE - x - 1].x = *(i) / sum;
-				i++;
-
-				data[y * SIDE + x].y = *(i) / sum;
-				data[(SIDE * (SHORT_SIDE - y - 1)) + SHORT_SIDE - x - 1].y = -*(i) / sum;
+				data[y * SIDE + x].x = *(i);
 				i++;
 				if (i - iorig >= elem_count) goto end;
 			}
 		}
 end:;
 
-//		cudaMemcpy(d_data, data, sizeof(cufftComplex) * SIDE * SHORT_SIDE, cudaMemcpyHostToDevice);
-		cudaMemcpy2D(d_data, sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE + SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, (SHORT_SIDE / 2 + SHORT_SIDE % 2) * sizeof(cufftComplex), SHORT_SIDE / 2 + SHORT_SIDE % 2, cudaMemcpyHostToDevice);
+		cudaMemcpy(d_data, data, sizeof(cufftComplex) * SIDE * SIDE, cudaMemcpyHostToDevice);
+/*		cudaMemcpy2D(d_data, sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE + SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, (SHORT_SIDE / 2 + SHORT_SIDE % 2) * sizeof(cufftComplex), SHORT_SIDE / 2 + SHORT_SIDE % 2, cudaMemcpyHostToDevice);
 		cudaMemcpy2D(&d_data[SIDE - SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2 * SIDE], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2 + SHORT_SIDE % 2, cudaMemcpyHostToDevice);
 		cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * SIDE], sizeof(cufftComplex) * SIDE, &data[SHORT_SIDE / 2], sizeof(cufftComplex) * SIDE, (SHORT_SIDE / 2 + SHORT_SIDE % 2) * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
-		cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * (SIDE + 1)], sizeof(cufftComplex) * SIDE, &data[0], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);
-
+		cudaMemcpy2D(&d_data[(SIDE - SHORT_SIDE / 2) * (SIDE + 1)], sizeof(cufftComplex) * SIDE, &data[0], sizeof(cufftComplex) * SIDE, SHORT_SIDE / 2 * sizeof(cufftComplex), SHORT_SIDE / 2, cudaMemcpyHostToDevice);*/
+		
 		cufftExecZ2Z(plan, d_data, d_pattern, CUFFT_FORWARD);
   }
 
@@ -190,13 +204,17 @@ end:;
 	{
 	  dofft(shortData);
 
-		double val = thrust::transform_reduce(thrust::make_zip_iterator(thrust::make_tuple(t_truePattern, t_mask, t_pattern)),
-                                         thrust::make_zip_iterator(thrust::make_tuple(&t_truePattern[SIDE * SIDE], &t_mask[SIDE * SIDE], &t_pattern[SIDE * SIDE])), likelihooder,
-					 (double) 0, thrust::plus<double>()) /*+ 34154. * SIDE * SIDE*/;
-		static int count = 0;
-		count++;
-		if (!(count & 255)) fflush(stdout);
-		return val;
+	  double val = thrust::transform_reduce(thrust::make_zip_iterator(thrust::make_tuple(t_truePattern, t_mask, t_data)),
+						thrust::make_zip_iterator(thrust::make_tuple(&t_truePattern[SIDE * SIDE], &t_mask[SIDE * SIDE], &t_data[SIDE * SIDE])), likelihooder,
+						(double) 0, thrust::plus<double>()) /*+ 34154. * SIDE * SIDE*/;
+
+	  val += thrust::transform_reduce(thrust::make_zip_iterator(thrust::make_tuple(thrust::make_counting_iterator(0), t_pattern)),
+						thrust::make_zip_iterator(thrust::make_tuple(thrust::make_counting_iterator(SIDE * SIDE), &t_pattern[SIDE * SIDE])), supportpenalizer,
+						(double) 0, thrust::plus<double>()) /*+ 34154. * SIDE * SIDE*/;
+	  static int count = 0;
+	  count++;
+	  if (!(count & 255)) fflush(stdout);
+	  return val;
 	}
 
 	double operator() (const column_vector& shortData) const {
@@ -265,7 +283,9 @@ printf("FILE %d\n", in);
 fflush(stdout);
 for (int x = 0; x < SIDE * SIDE; x++)
 {
-	fscanf(in, "%d", &data[x]);
+	double val;
+	fscanf(in, "%lf", &val);
+	data[x] = val;
 }
 }
 
@@ -315,28 +335,26 @@ evaluator eval;
 	int skips = 0;
 	column_vector guess;
 	guess.set_size(elem_count, 1);
-	//	guess(elem_count) = 1;
-	for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
-	{
-		for (int x = 0; x < SHORT_SIDE; x++)
-		{
-			int index = y * SIDE + x;
-			if ((y * SHORT_SIDE + x) * 2 >= elem_count) goto end;
-			float angle = randval(0, M_PI * 2);
-			float val = randval(1e-10, 15);
-			//cufftComplex old = data[index];
 
-//			guess((y * SHORT_SIDE + x) * 2) = val * cos(angle);
-//			guess((y * SHORT_SIDE + x) * 2 + 1) = val * sin(angle);
-			double r = y - SHORT_SIDE / 2 - SHORT_SIDE % 2;
-			r *= r;
-			double x2 = x - SHORT_SIDE / 2 - SHORT_SIDE % 2;
-			x2 *= x2;
-			r += x2;
-			guess((y * SHORT_SIDE + x) * 2) = 1 * exp(-r);
-			guess((y * SHORT_SIDE + x) * 2 + 1) = 0.0;
+	column_vector lower;
+	column_vector upper;
+	lower.set_size(elem_count, 1);
+	upper.set_size(elem_count, 1);
+	//	guess(elem_count) = 1;
+	for (int y = 0; y < SIDE; y++)
+	{
+		for (int x = 0; x < SIDE; x++)
+		{
+			float val = /*randval(1e-10, 15)*/ truePattern[y * SIDE + x];
+			//cufftComplex old = data[index];
+			if (val <= 1e-9) val = 1e-2;
+			guess(y * SIDE + x) = val;
+			lower(y * SIDE + x) = 1e-9;
+			upper(y * SIDE + x) = 1e6;
 		}
 	}
+
+	//lower(SIDE * (SIDE / 2) + SIDE / 2) = 1e5;
 end:;
 
 /*        printf("Maximum: %lf\n", find_min_bobyqa(eval, guess, 2 * SHORT_SIDE * SHORT_SIDE + 10, uniform_matrix<double>(elem_count + 1,1,-25000), uniform_matrix<double>(elem_count + 1,1, 25000),
@@ -347,74 +365,17 @@ end:;
                                                gradient_norm_stop_strategy(1e-7).be_verbose(),
                                                eval, guess, -1e30));*/
 
-	for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
-	{
-		for (int x = 0; x < SHORT_SIDE; x++)
-		{
-			int index = y * SIDE + x;
-			if ((y * SHORT_SIDE + x) * 2 >= elem_count) goto end2;
-			float angle = randval(0, M_PI * 2);
-			float val = randval(1e-10, 15);
-			//cufftComplex old = data[index];
-
-			guess((y * SHORT_SIDE + x) * 2) = val * cos(angle);
-			guess((y * SHORT_SIDE + x) * 2 + 1) = val * sin(angle);
-			/*double r = y - SHORT_SIDE / 2 - SHORT_SIDE % 2;
-			r *= r;
-			double x2 = x - SHORT_SIDE / 2 - SHORT_SIDE % 2;
-			x2 *= x2;
-			r += x2;
-			guess((y * SHORT_SIDE + x) * 2) = 1 * exp(-r);
-			guess((y * SHORT_SIDE + x) * 2 + 1) = 0.0;*/
-		}
-	}
-end2:;
-
-factor = 1e12;
-	for (; factor < 1e13; factor *= 2)
+factor = 1.0 / 256;
+//	for (; factor <= 1; factor *= 2)
 {
 	likelihooder.factor = factor;	
-        printf("Maximum3: %lf %lf\n", find_min_using_approximate_derivatives(cg_search_strategy(),
+	supportpenalizer.factor = factor;
+        printf("Maximum3: %lf %lf\n", find_min_box_constrained(lbfgs_search_strategy(5),
                                                objective_delta_stop_strategy(1e-7, 2000).be_verbose(),
-                                               eval, guess, -1e30), factor);
+							       eval, derivative(eval), guess, lower, upper), factor);
 /*        printf("Maximum2: %lf %lf\n", find_min(cg_search_strategy(),
                                                objective_delta_stop_strategy(1e-7, 2000).be_verbose(),
                                                eval, deriv, guess, -1e30), factor);*/
-}
-
-	for (int y = 0; y < SHORT_SIDE / 2 + SHORT_SIDE % 2; y++)
-	{
-		for (int x = 0; x < SHORT_SIDE; x++)
-		{
-			int index = y * SIDE + x;
-			if ((y * SHORT_SIDE + x) * 2 >= elem_count) goto end3;
-			float angle = randval(0, M_PI * 2);
-			float val = randval(1e-10, 15);
-			//cufftComplex old = data[index];
-
-			guess((y * SHORT_SIDE + x) * 2) = val * cos(angle);
-			guess((y * SHORT_SIDE + x) * 2 + 1) = val * sin(angle);
-			/*double r = y - SHORT_SIDE / 2 - SHORT_SIDE % 2;
-			r *= r;
-			double x2 = x - SHORT_SIDE / 2 - SHORT_SIDE % 2;
-			x2 *= x2;
-			r += x2;
-			guess((y * SHORT_SIDE + x) * 2) = 1 * exp(-r);
-			guess((y * SHORT_SIDE + x) * 2 + 1) = 0.0;*/
-		}
-	}
-end3:;
-factor = 1;
-
-	for (; factor < 0; factor *= 2)
-{
-	likelihooder.factor = factor;	
-/*        printf("Maximum3: %lf %lf\n", find_min_using_approximate_derivatives(cg_search_strategy(),
-                                               objective_delta_stop_strategy(1e-7, 2000).be_verbose(),
-                                               eval, guess, -1e30), factor);*/
-        printf("Maximum2: %lf %lf\n", find_min(bfgs_search_strategy(),
-                                               objective_delta_stop_strategy(1e-7, 2000).be_verbose(),
-                                               eval, deriv, guess, -1e30), factor);
 }
 
 
