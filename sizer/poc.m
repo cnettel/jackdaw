@@ -31,30 +31,55 @@ for i = 0:send
       
      g = (g .* (g > 0)) + (g .* (g <= 0) .* (bilden >= 1e-9));
      g(mask4) = 0;
+	 gorig = g;
      
-%      j = 1;
-%      while true
-%      gfN = fft2(g);
-%      gf2N = gfN;
-%      gf2N(7:409,:) = 0;
-%      gf2N(:,7:409) = 0;
-%      val = ifft2(gf2N);
-%      uncut = val;
-%      val = real(val);
-%      val = (val .* (val > 0)) + (val .* (val <= 0) .* (bilden > 1e-8));
-%      gold = g;
-%      g = val;
-%      if (norm(uncut - g,1) * 1e8 < norm(g,1))
-%          break
-%      end
-%      if mod(j,1000) == 0
-%          [j/1000 log10(norm(uncut - g, 1)/norm(g,1))]
-%      end
-%      j = j + 1;
-%      end
+      j = 1;
+	  while true
+      gfN = fft2(g);
+      gf2N = gfN;
+      gf2N(7:409,:) = 0;
+      gf2N(:,7:409) = 0;
+      val = ifft2(gf2N);
+      uncut = val;
+      val = real(val);
+	  val(mask3 > 0) = gorig(mask3 > 0);
+      val = (val .* (val > 0)) + (val .* (val <= 0) .* (bilden > 1e-8));
+      gold = g;
+      g = val;
+      if (norm(gold - g,1) * 1e8 < norm(g,1))
+          break
+      end
+      if mod(j,1000) == 0
+          [j/1000 log10(norm(gold - g, 1)/norm(g,1))]
+      end
+      j = j + 1;
+      end
+
+	  j = 1
+      while true
+      gfN = fft2(g);
+      gf2N = gfN;
+      gf2N(7:409,:) = 0;
+      gf2N(:,7:409) = 0;
+      val = ifft2(gf2N);
+      uncut = val;
+      val = real(val);
+      val = (val .* (val > 0)) + (val .* (val <= 0) .* (bilden > 1e-8));
+      gold = g;
+      g = val;
+      if (norm(uncut - g,1) * 1e8 < norm(g,1))
+          break
+      end
+      if mod(j,1000) == 0
+          [j/1000 log10(norm(uncut - g, 1)/norm(g,1))]
+      end
+      j = j + 1;
+      end
      val = g;
      oldbilden = bilden;
-     bilden = bilden + val / max(max(abs(val)))*step;
+
+	 step = fminbnd(@(x) plogl(bilden + val * x, bild59), -1000, 1000)
+     bilden = bilden + val * step;
      stepnow = bilden;
      
      j = 1;
@@ -71,20 +96,7 @@ for i = 0:send
      bilden(mask3 > 0) = stepnow(mask3> 0);
      mask = bilden >= 1e-9;
      bilden = bilden .* mask + (1e-8) .* (1 - mask);
-     
-%      bilden = fft2(bilden - lambda59);
-%      bilden(7:408,:) = 0;
-%      bilden(:,7:408) = 0;
-%      bilden = ifft2(bilden);
-%      %bilden = bilden;
-%      bilden = real(bilden) + lambda59;
-%      
-%      minval = min(bilden(:));
-%      add = minval -1e-8;
-%      
-%      if add < 0
-%          bilden = bilden - add;
-%      end
+
      diff = norm(bilden - oldstep, 1);
      if diff * 1e8 < norm(bilden,1)
          break
