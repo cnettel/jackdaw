@@ -32,9 +32,14 @@ struct idealsphere : public thrust::unary_function<int, float>
   
   __host__ __device__ float operator () (const int& data) {
     if (!dLambdas[data]) return 0;
+    int rawx = data % NX;
+    int rawy = data / NX;
 
-    float x = (data % NX) - offsetx;
-    float y = (data / NX) - offsety;
+    if (rawx < 216) rawx += 31;
+    if (rawy < 198) rawy += 31;
+
+    float x = rawx - offsetx;
+    float y = rawy - offsety;
     
     float q = sqrt(x * x + y * y);
     float val = 3 * (sinpif(2 * q * r)  - 2 * ((float) CUDART_PI_F) * q * r * cospif(2 * q * r));
@@ -101,8 +106,8 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float lsum, float psum)
 {
   myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx) * 4 + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 4 + myspherer.baseoffsety);
+  myspherer.offsetx = (tx) * 2 + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 2 + myspherer.baseoffsety);
   myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx)) + 1.0;
 //    myspherer.lfactor = 1.0;
 
@@ -226,8 +231,9 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (y < 233 || (x < 300 && y < 314) || x < 255)
-//	      if (y < 233 || (x < 350 && y < 370) || x < 255)
+	      if (x > 393 || y > 411 || ((y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 39 && x > 312 && x < 393) &&
+	      !(x < 170 && x > 60 && y < 98 && y > 40)))
+//	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
 	      {
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
@@ -242,8 +248,8 @@ int main()
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 51 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 51 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 19 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 19 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
