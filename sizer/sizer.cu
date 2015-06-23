@@ -106,8 +106,8 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float lsum, float psum)
 {
   myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx) * 2 + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 2 + myspherer.baseoffsety);
+  myspherer.offsetx = (tx) * 5 + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 5 + myspherer.baseoffsety);
   myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx)) + 1.0;
 //    myspherer.lfactor = 1.0;
 
@@ -248,8 +248,8 @@ int main()
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 19 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 19 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 89 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 89 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
