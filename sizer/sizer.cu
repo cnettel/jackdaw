@@ -39,7 +39,7 @@ struct idealsphere : public thrust::unary_function<int, float>
 
     /*if (rawx < 211) rawx += 37;
     if (rawy < 219) rawy += 11;*/
-    if (rawx < 213 - extrax * 2) rawx += /*29*/ 20 + extrax * 2;
+    if (rawx < 233 - extrax * 3) rawx += /*29*/ extrax * 3;
     if (rawy < 226 - extray * 2) rawy += /*3*/ + extray * 2;
 
     float x = rawx - offsetx;
