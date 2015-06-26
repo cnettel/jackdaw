@@ -39,8 +39,8 @@ struct idealsphere : public thrust::unary_function<int, float>
 
     /*if (rawx < 211) rawx += 37;
     if (rawy < 219) rawy += 11;*/
-    if (rawx < 233 - extrax * 3) rawx += /*29*/ -9 + extrax * 3;
-    if (rawy < 226 - extray * 2) rawy += /*3*/ -6 + extray * 2;
+//    if (rawx < 233 - extrax * 3) rawx += /*29*/ -18 + extrax * 3;
+//    if (rawy < 226 - extray * 2) rawy += /*3*/ -12 + extray * 2;*/
 
     float x = rawx - offsetx;
     float y = rawy - offsety;
@@ -185,12 +185,12 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_12nm/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RNAPII_600mm_1022/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
+//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
-//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
+           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_70nmICO/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/12nm_SIM/HITS/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/20sizes_RNA/forCARL_PDB/HITS_PDB.h5", H5F_ACC_RDONLY);
@@ -251,7 +251,7 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (x > 393 || y > 411 || ((x + y > 700) || (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 39 && x > 312 && x < 393) &&
+	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 39 && x > 312 && x < 393) &&
 	      !(x < 170 && x > 60 && y < 98 && y > 40)))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
 	      {
@@ -263,13 +263,13 @@ int main()
 	    }
 	}
       
-      if (psum - lsum < 1000) continue;
-      dim3 grid(8, 8, 1250);
+      if (psum - lsum < 2500) continue;
+      dim3 grid(1, 1, 1250);
       dim3 block(32, 32, 1);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 19 - 0.5; // good val -10
+      spherer.baseoffsetx = NX / 2 - 10 - 51 - 0.5; // good val -10
       spherer.baseoffsety = NY / 2 + 10 - 19 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
