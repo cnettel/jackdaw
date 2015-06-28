@@ -22,6 +22,7 @@ struct idealsphere : public thrust::unary_function<int, float>
   float baseoffsetx;
   float baseoffsety;
   float lfactor;
+  float ebase;
   float offsetx, offsety;
   float r;
   int extrax;
@@ -37,6 +38,8 @@ struct idealsphere : public thrust::unary_function<int, float>
     int rawx = data % NX;
     int rawy = data / NX;
 
+    if (rawx < 211) rawx += 4;
+    if (rawy < 219) rawy += 4;
     /*if (rawx < 211) rawx += 37;
     if (rawy < 219) rawy += 11;*/
 //    if (rawx < 233 - extrax * 3) rawx += /*29*/ -18 + extrax * 3;
@@ -75,7 +78,10 @@ struct likelihood : public thrust::unary_function<int, float>
 __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(spherer), factor(factor) {}
 
   __host__ __device__ float getIntensity(const int& data) {
-  	float intensity = spherer(data) * factor + spherer.dLambdas[data] * spherer.lfactor;
+  	float lbase = spherer.dLambdas[data] * spherer.lfactor;
+	lbase += spherer.ebase;
+	if (lbase < 2e-3) lbase = 2e-3;
+  	float intensity = spherer(data) * factor + lbase;
 
 	return intensity;
   }
@@ -124,7 +130,11 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
   myspherer.offsety = (ty * 2 + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
-  myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) /*bx*/ 0)) + 1.0;
+  //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
+  myspherer.lfactor = pow(1.04, bx - 24 * 0.5); 
+//  myspherer.ebase = (0 + bx) * 1e-4;
+  myspherer.ebase = -lsum * (myspherer.lfactor - 1) / 46215;
+  myspherer.ebase = 0;
 //    myspherer.lfactor = 1.0;
 
   float intensity = thrust::reduce(thrust::seq,
@@ -138,7 +148,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 intens[idx] = 0;*/
 intensityfactor = 1e-13;
 }
-  intensityfactor *= pow(1.2, /*by*/ - 0 * 0.5);
+  intensityfactor *= pow(1.02, by - 0 * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -251,8 +261,10 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 39 && x > 312 && x < 393) &&
-	      !(x < 170 && x > 60 && y < 98 && y > 40)))
+	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 39 && x > 290 && x < 393) &&
+	      !(x < 170 && x > 60 && y < 98 && y > 40) &&
+	      !(x < 290 && x > 254 && y < 120 && y > 39) &&
+	      !(x < 88 && x > 19 && y < 130 && y > 97)))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
 	      {
 		photonVals[y][x] = 0;
@@ -263,14 +275,14 @@ int main()
 	    }
 	}
       
-      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, 1250);
-      dim3 block(32, 32, 1);
+//      if (psum - lsum < 2500) continue;
+      dim3 grid(32, 1, 1350);
+      dim3 block(11, 16, 1);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 51 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 19 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 9 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 9 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
