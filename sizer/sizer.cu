@@ -24,7 +24,9 @@ struct idealsphere : public thrust::unary_function<int, float>
   float lfactor;
   float ebase;
   float offsetx, offsety;
+//  float arraybase;
   float r;
+  int tid;
   int extrax;
   int extray;
   thrust::device_ptr<short> dPhotons;
@@ -80,7 +82,7 @@ __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(sph
   __host__ __device__ float getIntensity(const int& data) {
   	float lbase = spherer.dLambdas[data] * spherer.lfactor;
 	lbase += spherer.ebase;
-	if (lbase < 2e-3) lbase = 2e-3;
+//	if (lbase < 2e-3) lbase = 2e-3;
   	float intensity = spherer(data) * factor + lbase;
 
 	return intensity;
@@ -131,7 +133,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
   myspherer.extrax = bx;
   myspherer.extray = by;
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
-  myspherer.lfactor = pow(1.04, bx - 24 * 0.5); 
+  //myspherer.lfactor =  1.00 * pow(1.04, bx - 2 * 0.5);
 //  myspherer.ebase = (0 + bx) * 1e-4;
   myspherer.ebase = -lsum * (myspherer.lfactor - 1) / 46215;
   myspherer.ebase = 0;
@@ -148,7 +150,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 intens[idx] = 0;*/
 intensityfactor = 1e-13;
 }
-  intensityfactor *= pow(1.02, by - 0 * 0.5);
+  //intensityfactor *= pow(1.01, myspherer.tid - 128 * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -197,10 +199,10 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
-           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
+//           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_70nmICO/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/12nm_SIM/HITS/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/20sizes_RNA/forCARL_PDB/HITS_PDB.h5", H5F_ACC_RDONLY);
@@ -215,14 +217,14 @@ int main()
   hsize_t fullsize[3];
   lambdaSpace.getSimpleExtentDims(fullsize);
 
-  H5::H5File expectedLambdaFile(string(getenv("SLURM_JOB_ID")) + ".h5", H5F_ACC_TRUNC);
-  H5::DataSet expectedLambdas = expectedLambdaFile.createDataSet("explambdas", H5::PredType::NATIVE_FLOAT, lambdaSpace);
-  H5::DataSpace expectedLambdaSpace = expectedLambdas.getSpace();
-  H5::DataSet logLs = expectedLambdaFile.createDataSet("logl", H5::PredType::NATIVE_FLOAT, lambdaSpace);
-  H5::DataSpace logLsSpace = expectedLambdas.getSpace();
+//  H5::H5File expectedLambdaFile(string(getenv("SLURM_JOB_ID")) + ".h5", H5F_ACC_TRUNC);
+//  H5::DataSet expectedLambdas = expectedLambdaFile.createDataSet("explambdas", H5::PredType::NATIVE_FLOAT, lambdaSpace);
+//  H5::DataSpace expectedLambdaSpace = expectedLambdas.getSpace();
+//  H5::DataSet logLs = expectedLambdaFile.createDataSet("logl", H5::PredType::NATIVE_FLOAT, lambdaSpace);
+//  H5::DataSpace logLsSpace = expectedLambdas.getSpace();
 
   lambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
-  logLsSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
+//  logLsSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
   photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
   H5::DataSpace memSpace(3, count);
 
@@ -240,12 +242,17 @@ int main()
   thrust::host_vector<float> hIntensity2(175000000);
 
   idealsphere spherer(dPhotons, dLambdas);
+  char* taskid = getenv("SLURM_ARRAY_TASK_ID");
+  int tid;
+  sscanf(taskid, "%d", &tid);
+  spherer.lfactor = 1.0 * pow(1.01, (tid) - 64);
+  spherer.tid = tid;
 
   for (int img = 0; img < fullsize[0]; img++)
     {
       offset[0] = img;
       lambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
-      expectedLambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
+//      expectedLambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       lambdas.read(lambdaVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, lambdaSpace);
       photons.read(photonVals.data(), H5::PredType::NATIVE_SHORT, memSpace, photonSpace);
@@ -276,13 +283,13 @@ int main()
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(32, 1, 1350);
-      dim3 block(11, 16, 1);
+      dim3 grid(1, 1, 1350);
+      dim3 block(32, 32, 1);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 9 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 9 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 29 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 35 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
@@ -305,15 +312,15 @@ float maxval = -1e30;
 	if (hIntensity[k] < minval) minval = hIntensity[k];
 }
 
-      dim3 unigrid(1,1,1);
+/*      dim3 unigrid(1,1,1);
       dim3 uniblock(1,1,1);
       getExpLambdas<<<unigrid, uniblock>>>(dExpLambdas.data().get(), dLogLs.data().get(), maxidx, spherer, psum, lsum, block, grid);
-      expLambdaVals.assign(dExpLambdas.begin(), dExpLambdas.end());
-      logLsVals.assign(dLogLs.begin(), dLogLs.end());
-      expectedLambdas.write(expLambdaVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, expectedLambdaSpace);
-      logLs.write(logLsVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, expectedLambdaSpace);
+      expLambdaVals.assign(dExpLambdas.begin(), dExpLambdas.end());*/
+//      logLsVals.assign(dLogLs.begin(), dLogLs.end());
+//      expectedLambdas.write(expLambdaVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, expectedLambdaSpace);
+//      logLs.write(logLsVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, expectedLambdaSpace);
       //expectedLambdaFile.flush(H5F_SCOPE_LOCAL);
-      hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
+      //hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
 	int maxR = maxidx / grid.y / block.y / grid.x / block.x;
 	int maxX = maxidx % block.x;
 	int maxY = (maxidx / (grid.x * block.x)) % block.y;
