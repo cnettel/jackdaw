@@ -199,7 +199,7 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -229,6 +229,7 @@ int main()
   H5::DataSpace memSpace(3, count);
 
   boost::multi_array<float, 2> lambdaVals(extents[NY][NX]);
+  boost::multi_array<float, 2> lambdaValsZero(extents[NY][NX]);
   thrust::host_vector<float> expLambdaVals(NY * NX);
   thrust::host_vector<float> logLsVals(NY * NX);
   boost::multi_array<short, 2> photonVals(extents[NY][NX]);
@@ -255,6 +256,10 @@ int main()
 //      expectedLambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       lambdas.read(lambdaVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, lambdaSpace);
+      if (img == 0)
+      {
+	lambdaValsZero = lambdaVals;
+      }     
       photons.read(photonVals.data(), H5::PredType::NATIVE_SHORT, memSpace, photonSpace);
       int psum = 0;
       double lsum = 0;
@@ -268,11 +273,17 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 39 && x > 290 && x < 393) &&
-	      !(x < 170 && x > 60 && y < 98 && y > 40) &&
-	      !(x < 290 && x > 254 && y < 120 && y > 39) &&
-	      !(x < 88 && x > 19 && y < 130 && y > 97)))
+	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 290 && x < 393) &&
+	      !(x < 170 && x > 2 && y < 180 && y > 15) &&
+	      !(x < 290 && x > 254 && y < 120 && y > 15) &&
+	      !(x < 88 && x > 19 && y < 130 && y > 97)) &&
+	      !(x < 45 && x > 1 && y < 414 && y > 362))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
+	      {
+		photonVals[y][x] = 0;
+		lambdaVals[y][x] = 0;
+	      }
+	      if (lambdaValsZero[y][x] < 0.02)
 	      {
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
