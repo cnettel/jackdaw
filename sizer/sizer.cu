@@ -273,12 +273,16 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 290 && x < 393) &&
+	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 2790 && x < 393) &&
 	      !(x < 170 && x > 2 && y < 180 && y > 15) &&
 	      !(x < 290 && x > 254 && y < 120 && y > 15) &&
 	      !(x < 88 && x > 19 && y < 130 && y > 97)) &&
 	      !(x < 45 && x > 1 && y < 414 && y > 362))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
+	      /*if (!((x < 45 && x > 1 && y < 414 && y > 362)) &&
+	          !((x < 170 && x > 1 && y < 24 && y > 15)) &&
+		  !((x > 255 && x < 390 && y < 24 && y > 15)) &&
+		  !(y > 15 && x > 1 && x + y < 81))*/
 	      {
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
@@ -294,13 +298,13 @@ int main()
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, 1350);
-      dim3 block(32, 32, 1);
+      dim3 grid(1, 1, 1250);
+      dim3 block(22, 19, 1);
 
       spherer.rfactor = 0.005;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 29 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 35 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 21 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 11 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
