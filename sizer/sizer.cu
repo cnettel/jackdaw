@@ -53,21 +53,58 @@ struct idealsphere : public thrust::unary_function<int, float>
     float q = sqrt(x * x + y * y);
 float val;
     float den = (2 * ((float) CUDART_PI_F) * q * r);
-    if (r > 0.5e-4)
+    if (r > 0.47e-4)
 {
     if ( r < 1e-4)
+{
     val = 3 * den;
+    if (r < 0.5e-4)
+    {
+	val *= den;
+    }
+    if (r < 0.48e-4)
+    {
+       val /= sqrt(den);
+    }
+}
 else
     val = 3 * (sinpif(2 * q * r)  - 2 * ((float) CUDART_PI_F) * q * r * cospif(2 * q * r));
 
     den = den * den * den;
     
     val /= den;
-    val = val * val;
 }
 else
 val = 1.0f;
+
+// Global spherical convolution 
+if (false)
+{   
+    float r = tid * 1e-4;
+    den = (2 * ((float) CUDART_PI_F) * q * r);
+    val *= 3 * (sinpif(2 * q * r)  - 2 * ((float) CUDART_PI_F) * q * r * cospif(2 * q * r));
+
+    den = den * den * den;
+    val /= den;
+}
+// Glocal circular convolution
+if (false)
+{   
+    float r = tid * 1e-4;
+    den = (2 * ((float) CUDART_PI_F) * q * r);
+    val *= 2 * j1(den);
     
+    val /= den;
+}
+// Global normal convolution
+/*{
+    float sigma = NX * 0.1 * tid;
+    val *= exp(-q*q/(2*sigma*sigma));
+}*/
+
+
+    val = val * val;
+
     return val;
   }
 };
@@ -199,7 +236,7 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Rubisco/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -246,7 +283,7 @@ int main()
   char* taskid = getenv("SLURM_ARRAY_TASK_ID");
   int tid;
   sscanf(taskid, "%d", &tid);
-  spherer.lfactor = 1.0 * pow(1.01, (tid) - 64);
+  spherer.lfactor = 1.0 /** pow(1.01, (tid) - 64)*/;
   spherer.tid = tid;
 
   for (int img = 0; img < fullsize[0]; img++)
@@ -277,7 +314,9 @@ int main()
 	      !(x < 170 && x > 2 && y < 180 && y > 15) &&
 	      !(x < 290 && x > 254 && y < 120 && y > 15) &&
 	      !(x < 88 && x > 19 && y < 130 && y > 97)) &&
-	      !(x < 45 && x > 1 && y < 414 && y > 362))
+	      !(x < 45 && x > 1 && y < 414 && y > 362) &&
+	      !(x > 252 && x < 393 && y < 411 && y > 234) &&
+	      !(x > 252 && x < 393 && y < 186 && y > 15))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
 	      /*if (!((x < 45 && x > 1 && y < 414 && y > 362)) &&
 	          !((x < 170 && x > 1 && y < 24 && y > 15)) &&
@@ -287,7 +326,7 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }
-	      if ((y - 220) * (y-220) + (x-200) * (x-200) > 20000)
+	      if ((y - 230) * (y-230) + (x-200) * (x-200) < 10000)
 	      {
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
@@ -323,7 +362,7 @@ float maxval = -1e30;
 	{
 		maxval = hIntensity[k];
 		maxint = hIntensity2[k];
-		maxidx = k;
+<		maxidx = k;
 	}
 	if (hIntensity[k] < minval) minval = hIntensity[k];
 }
