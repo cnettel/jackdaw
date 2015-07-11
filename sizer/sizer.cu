@@ -165,8 +165,8 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float lsum, float psum)
 {
   myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx) * 2 + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 2 + myspherer.baseoffsety);
+  myspherer.offsetx = (tx) * 1.19 + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 1.19 + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
@@ -187,7 +187,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 intens[idx] = 0;*/
 intensityfactor = 1e-13;
 }
-  //intensityfactor *= pow(1.01, myspherer.tid - 128 * 0.5);
+  intensityfactor *= pow(1.0075, myspherer.tid - 64 * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -338,12 +338,12 @@ int main()
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, 1250);
-      dim3 block(22, 19, 1);
+      dim3 grid(1, 1, 2700);
+      dim3 block(32, 32, 1);
 
-      spherer.rfactor = 0.005;
+      spherer.rfactor = 0.0025;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 21 - 0.5; // good val -10
+      spherer.baseoffsetx = NX / 2 - 10 - 15 - 0.5; // good val -10
       spherer.baseoffsety = NY / 2 + 10 - 11 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
@@ -362,7 +362,7 @@ float maxval = -1e30;
 	{
 		maxval = hIntensity[k];
 		maxint = hIntensity2[k];
-<		maxidx = k;
+		maxidx = k;
 	}
 	if (hIntensity[k] < minval) minval = hIntensity[k];
 }
