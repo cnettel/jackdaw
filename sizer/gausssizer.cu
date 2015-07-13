@@ -2,6 +2,7 @@
 #include <boost/multi_array.hpp>
 #include <H5Cpp.h>
 
+#include <cufft.h>
 #include <thrust/execution_policy.h>
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
@@ -15,21 +16,57 @@ using namespace std;
 const int NX = 414;
 const int NY = 414;
 
+const int FX = 2048;
+const int FY = 2048;
+
+struct realsphere : public thrust::unary_function<int, cufftComplex>
+{
+  float r;
+  float sigma;
+  float x;
+  float y;
+
+  __host__ __device__ cufftComplex operator () (const int& data) {
+    int rawx = data & (FX - 1);
+    int rawy = data / FX;
+    float qx = rawx - x - FX * 0.5;
+    float qy = rawy - y - FY * 0.5;
+
+    float r2 = r * r - qx * qx + qy * qy;
+    if (r2 < 0) r2 = 0;
+
+    r2 = sqrt(r2);
+    
+    qx += x;
+    qy += y;
+    float gr = qx * qx + qy * qy;
+    cufftComplex val;
+    val.y = 0;
+    val.x = r2 * exp(- gr / (2 * sigma * sigma)); 
+    return val;
+  }
+};
+
+struct absfunc : public thrust::unary_function<cufftComplex, float>
+{
+  __host__ __device__ float operator () (const cufftComplex& val) {
+      return /* sqrt*/ (val.x * val.x + val.y * val.y);
+  }
+} sqabser;
+
 struct idealsphere : public thrust::unary_function<int, float>
 {
-  float rfactor;
-  float roffset;
-  float baseoffsetx;
-  float baseoffsety;
-  float lfactor;
-  float ebase;
-  float offsetx, offsety;
+  int offsetx, offsety;
+  float baseoffsetx, baseoffsety;
 //  float arraybase;
   float r;
+  float lfactor;
+  float ebase;
   int tid;
   int extrax;
   int extray;
   thrust::device_ptr<short> dPhotons;
+  thrust::device_ptr<float> dPattern;
   thrust::device_ptr<float> dLambdas;
 
   idealsphere(thrust::device_vector<short>& dPhotons, thrust::device_vector<float>& dLambdas) :
@@ -47,65 +84,12 @@ struct idealsphere : public thrust::unary_function<int, float>
 //    if (rawx < 233 - extrax * 3) rawx += /*29*/ -18 + extrax * 3;
 //    if (rawy < 226 - extray * 2) rawy += /*3*/ -12 + extray * 2;*/
 
-    float x = rawx - offsetx;
-    float y = rawy - offsety;
-    
-    float q = sqrt(x * x + y * y);
-float val;
-    float den = (2 * ((float) CUDART_PI_F) * q * r);
-    if (r > 0.47e-4)
-{
-    if ( r < 1e-4)
-{
-    val = 3 * den;
-    if (r < 0.5e-4)
-    {
-	val *= den;
-    }
-    if (r < 0.48e-4)
-    {
-       val /= sqrt(den);
-    }
-}
-else
-    val = 3 * (sinpif(2 * q * r)  - 2 * ((float) CUDART_PI_F) * q * r * cospif(2 * q * r));
+    int x = rawx - offsetx;
+    int y = rawy - offsety;
+    if (x < 0) x += FX;
+    if (y < 0) y += FY;
 
-    den = den * den * den;
-    
-    val /= den;
-}
-else
-val = 1.0f;
-
-// Global spherical convolution 
-if (false)
-{   
-    float r = tid * 1e-4;
-    den = (2 * ((float) CUDART_PI_F) * q * r);
-    val *= 3 * (sinpif(2 * q * r)  - 2 * ((float) CUDART_PI_F) * q * r * cospif(2 * q * r));
-
-    den = den * den * den;
-    val /= den;
-}
-// Glocal circular convolution
-if (false)
-{   
-    float r = tid * 1e-4;
-    den = (2 * ((float) CUDART_PI_F) * q * r);
-    val *= 2 * j1(den);
-    
-    val /= den;
-}
-// Global normal convolution
-/*{
-    float sigma = NX * 0.1 * tid;
-    val *= exp(-q*q/(2*sigma*sigma));
-}*/
-
-
-    val = val * val;
-
-    return val;
+    return dPattern[y * FX + x];
   }
 };
 
@@ -164,7 +148,7 @@ struct intensitygetter : public thrust::unary_function<int, float>
 
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float lsum, float psum)
 {
-  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
+//  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
   myspherer.offsetx = (tx) * 1.19 + myspherer.baseoffsetx;
   myspherer.offsety = (ty * 1.19 + myspherer.baseoffsety);
   myspherer.extrax = bx;
@@ -187,7 +171,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 intens[idx] = 0;*/
 intensityfactor = 1e-13;
 }
-  intensityfactor *= pow(1.0075, myspherer.tid - 64 * 0.5);
+//  intensityfactor *= pow(1.0075, myspherer.tid - 64 * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -210,7 +194,7 @@ __global__ void getExpLambdas(float* target, float* target2, int maxidx, idealsp
 __global__ void computeintensity(float* target, float* intens, idealsphere myspherer, float psum, float lsum)
 {
   likelihood likelihooder = getObjects(myspherer, threadIdx.x, threadIdx.y, threadIdx.z + blockIdx.z * blockDim.z, blockIdx.x, blockIdx.y, lsum, psum);
-  float likelihood1 = thrust::reduce(thrust::seq,
+  float likelihood1 = thrust::reduce(thrust::device,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
 
@@ -274,17 +258,25 @@ int main()
   thrust::device_vector<float> dLambdas(NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
-  thrust::device_vector<float> dIntensity(175000000);
-  thrust::host_vector<float> hIntensity(175000000);
-  thrust::device_vector<float> dIntensity2(175000000);
-  thrust::host_vector<float> hIntensity2(175000000);
+  thrust::device_vector<float> dIntensity(32 * 32);
+  thrust::host_vector<float> hIntensity(32 * 32);
+  thrust::device_vector<float> dIntensity2(32 * 32);
+  thrust::host_vector<float> hIntensity2(32 * 32);
+
+  thrust::device_vector<cufftComplex> d_complexSpace(FY * FX);
+  thrust::device_vector<float> dPattern(FY * FX);
+  cufftHandle plan;  
+  cufftPlan2d(&plan, FX, FY, CUFFT_C2C);
 
   idealsphere spherer(dPhotons, dLambdas);
   char* taskid = getenv("SLURM_ARRAY_TASK_ID");
   int tid;
   sscanf(taskid, "%d", &tid);
   spherer.lfactor = 1.0 /** pow(1.01, (tid) - 64)*/;
+  spherer.dPattern = dPattern.data();
   spherer.tid = tid;
+  realsphere reals;
+  reals.sigma = 57;
 
   for (int img = 0; img < fullsize[0]; img++)
     {
@@ -338,34 +330,69 @@ int main()
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, 2700);
+      dim3 grid(1, 1, 1);
       dim3 block(32, 32, 1);
 
-      spherer.rfactor = 0.0025;
-      spherer.roffset = -10;
+      float rfactor = 0.0025;
+      float roffset = -10;
       spherer.baseoffsetx = NX / 2 - 10 - 15 - 0.5; // good val -10
       spherer.baseoffsety = NY / 2 + 10 - 11 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
-      
-      computeintensity<<<grid, block>>>(dIntensity.data().get(), dIntensity2.data().get(), spherer, psum, lsum);
-      hIntensity.assign(dIntensity.begin(), dIntensity.end());
-      hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
 
       float minval = 1e30;
-float maxval = -1e30;
+      float maxval = -1e30;
       int maxidx = 0;
       float maxint = 0;
-      for (int k = 0; k < grid.y * block.y * grid.x * block.x * grid.z * block.z; k++)
-{
-	if (hIntensity[k] > maxval)
+      int maxr = 0;
+      int maxdx = 0;
+      int maxdy = 0;
+      
+      for (int r = 0; r < 1800; r+=5)
 	{
-		maxval = hIntensity[k];
-		maxint = hIntensity2[k];
-		maxidx = k;
+	  if (r > 600) r += 5;
+	  if (r > 1200) r += 10;
+	  //float r2 = r * 1.1e-4 * 0.1;
+	  float r2 = r * 0.1;
+	  reals.r = r2;
+	  for (int dx = 0; dx <= 2 * reals.sigma; dx+=15)
+	    {
+	      for (int dy = - 2 * reals.sigma; dy <= 2 * reals.sigma; dy+=15)
+		{
+		  reals.x = dx;
+		  reals.y = dy;
+		  thrust::tabulate(thrust::device, d_complexSpace.data(), d_complexSpace.data() + FX * FY, reals);
+		  cufftExecC2C(plan, d_complexSpace.data().get(), d_complexSpace.data().get(), CUFFT_FORWARD);
+		  thrust::transform(thrust::device, d_complexSpace.begin(), d_complexSpace.end(), dPattern.begin(), sqabser);
+		  computeintensity<<<grid, block>>>(dIntensity.data().get(), dIntensity2.data().get(), spherer, psum, lsum);
+		  hIntensity.assign(dIntensity.begin(), dIntensity.end());
+		  hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
+		  for (int k = 0; k < grid.y * block.y * grid.x * block.x * grid.z * block.z; k++)
+		    {
+		      if (hIntensity[k] > maxval)
+			{
+			  maxval = hIntensity[k];
+			  maxint = hIntensity2[k];
+			  maxidx = k;
+			  maxr = r;
+			  maxdx = dx;
+			  maxdy = dy;
+			}
+		      if (hIntensity[k] < minval) minval = hIntensity[k];
+		    }
+		}
+	    }
+        int maxR = /*maxidx / grid.y / block.y / grid.x / block.x*/ maxr;
+	int maxX = maxidx % block.x;
+	int maxY = (maxidx / (grid.x * block.x)) % block.y;
+	int maxI = (maxidx / (block.x * grid.x * block.y)) % grid.y;
+	int maxI2 = (maxidx / block.x) % grid.x;
+	printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d %d %d\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint, maxI, maxI2, maxdx, maxdy); 
+      fflush(stdout);
 	}
-	if (hIntensity[k] < minval) minval = hIntensity[k];
-}
+
+
+
 
 /*      dim3 unigrid(1,1,1);
       dim3 uniblock(1,1,1);
@@ -376,13 +403,6 @@ float maxval = -1e30;
 //      logLs.write(logLsVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, expectedLambdaSpace);
       //expectedLambdaFile.flush(H5F_SCOPE_LOCAL);
       //hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
-	int maxR = maxidx / grid.y / block.y / grid.x / block.x;
-	int maxX = maxidx % block.x;
-	int maxY = (maxidx / (grid.x * block.x)) % block.y;
-	int maxI = (maxidx / (block.x * grid.x * block.y)) % grid.y;
-	int maxI2 = (maxidx / block.x) % grid.x;
 
-      printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint, maxI, maxI2);
-      fflush(stdout);
     }
 }
