@@ -32,7 +32,7 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     float qx = rawx - x - FX * 0.5;
     float qy = rawy - y - FY * 0.5;
 
-    float r2 = r * r - qx * qx + qy * qy;
+    float r2 = r * r - qx * qx - qy * qy;
     if (r2 < 0) r2 = 0;
 
     r2 = sqrt(r2);
@@ -220,7 +220,7 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -276,7 +276,7 @@ int main()
   spherer.dPattern = dPattern.data();
   spherer.tid = tid;
   realsphere reals;
-  reals.sigma = 57;
+  reals.sigma = 30;
 
   for (int img = 0; img < fullsize[0]; img++)
     {
@@ -355,9 +355,9 @@ int main()
 	  //float r2 = r * 1.1e-4 * 0.1;
 	  float r2 = r * 0.1;
 	  reals.r = r2;
-	  for (int dx = 0; dx <= 2 * reals.sigma; dx+=15)
+	  for (int dx = 0; dx <= 2 * reals.sigma; dx+=8)
 	    {
-	      for (int dy = - 2 * reals.sigma; dy <= 2 * reals.sigma; dy+=15)
+	      for (int dy = - 2 * reals.sigma; dy <= 2 * reals.sigma; dy+=8)
 		{
 		  reals.x = dx;
 		  reals.y = dy;
