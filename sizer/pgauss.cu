@@ -18,6 +18,7 @@ const int NY = 414;
 
 const int FX = 2048;
 const int FY = 2048;
+const int BS = 1024;
 
 struct realsphere : public thrust::unary_function<int, cufftComplex>
 {
@@ -249,19 +250,19 @@ int main()
   photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
   H5::DataSpace memSpace(3, count);
 
-  boost::multi_array<float, 2> lambdaVals(extents[NY][NX]);
-  boost::multi_array<float, 2> lambdaValsZero(extents[NY][NX]);
+  boost::multi_array<float, 3> lambdaVals(extents[BS][NY][NX]);
+  boost::multi_array<float, 3> lambdaValsZero(extents[BS][NY][NX]);
   thrust::host_vector<float> expLambdaVals(NY * NX);
   thrust::host_vector<float> logLsVals(NY * NX);
-  boost::multi_array<short, 2> photonVals(extents[NY][NX]);
-  thrust::device_vector<short> dPhotons(NY * NX);
-  thrust::device_vector<float> dLambdas(NY * NX);
+  boost::multi_array<short, 3> photonVals(extents[BS][NY][NX]);
+  thrust::device_vector<short> dPhotons(BS * NY * NX);
+  thrust::device_vector<float> dLambdas(BS * NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
-  thrust::device_vector<float> dIntensity(32 * 32);
-  thrust::host_vector<float> hIntensity(32 * 32);
-  thrust::device_vector<float> dIntensity2(32 * 32);
-  thrust::host_vector<float> hIntensity2(32 * 32);
+  thrust::device_vector<float> dIntensity(BS * 32 * 32);
+  thrust::host_vector<float> hIntensity(BS * 32 * 32);
+  thrust::device_vector<float> dIntensity2(BS * 32 * 32);
+  thrust::host_vector<float> hIntensity2(BS * 32 * 32);
 
   thrust::device_vector<cufftComplex> d_complexSpace(FY * FX);
   thrust::device_vector<float> dPattern(FY * FX);
@@ -278,8 +279,11 @@ int main()
   realsphere reals;
   reals.sigma = 30;
 
-  for (int img = 0; img < fullsize[0]; img++)
+  for (int img = 0; img < fullsize[0]; img+=BS)
     {
+	int end = min(fullsize[0], img + BS);
+	int imgcount = end - img;
+	count[0] = imgcount;
       offset[0] = img;
       lambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
 //      expectedLambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
