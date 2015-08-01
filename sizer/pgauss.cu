@@ -18,7 +18,7 @@ const int NY = 414;
 
 const int FX = 2048;
 const int FY = 2048;
-const int BS = 1024;
+const int BS = 256;
 
 struct realsphere : public thrust::unary_function<int, cufftComplex>
 {
@@ -34,7 +34,7 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     float qy = rawy - y - FY * 0.5;
 
     float r2 = r * r - qx * qx - qy * qy;
-    if (r2 < 0) r2 = 0;
+    if (r2 < 0.f) r2 = 0.f;
 
     r2 = sqrt(r2);
     
@@ -42,8 +42,8 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     qy += y;
     float gr = qx * qx + qy * qy;
     cufftComplex val;
-    val.y = 0;
-    val.x = r2 * exp(- gr / (2 * sigma * sigma)); 
+    val.y = 0.f;
+    val.x = r2 * (0.01f + 0.99f * expf(- gr / (2 * sigma * sigma))); 
     return val;
   }
 };
@@ -147,17 +147,19 @@ struct intensitygetter : public thrust::unary_function<int, float>
   }
 };
 
-__device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float lsum, float psum)
+__device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float* lsum, int* psum)
 {
 //  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx) * 1.19 + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 1.19 + myspherer.baseoffsety);
+  myspherer.offsetx = (tx) * 1.19f + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 1.19f + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
+  myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
+  myspherer.dLambdas = &myspherer.dLambdas[zval * NY * NX];
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
   //myspherer.lfactor =  1.00 * pow(1.04, bx - 2 * 0.5);
 //  myspherer.ebase = (0 + bx) * 1e-4;
-  myspherer.ebase = -lsum * (myspherer.lfactor - 1) / 46215;
+  myspherer.ebase = -lsum[zval] * (myspherer.lfactor - 1) / 46215;
   myspherer.ebase = 0;
 //    myspherer.lfactor = 1.0;
 
@@ -165,7 +167,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), myspherer),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), myspherer));
 
-  float intensityfactor = (psum - lsum * myspherer.lfactor) / intensity;
+  float intensityfactor = (psum[zval] - lsum[zval] * myspherer.lfactor) / intensity;
   if (intensityfactor < 1e-13)
 {
 /*target[idx] = -1e10;
@@ -178,7 +180,7 @@ intensityfactor = 1e-13;
   return likelihooder;
 }
 
-__global__ void getExpLambdas(float* target, float* target2, int maxidx, idealsphere myspherer, float psum, float lsum, dim3 block, dim3 grid)
+/*__global__ void getExpLambdas(float* target, float* target2, int maxidx, idealsphere myspherer, int psum, float lsum, dim3 block, dim3 grid)
 {
   int tx = maxidx % block.x;
   int bx = (maxidx / block.x) % grid.x;
@@ -190,12 +192,13 @@ __global__ void getExpLambdas(float* target, float* target2, int maxidx, idealsp
 
   thrust::tabulate(thrust::device, target, target + NX * NY, intensities);
   thrust::tabulate(thrust::device, target2, target2 + NX * NY, likelihooder);
-}
+}*/
 
-__global__ void computeintensity(float* target, float* intens, idealsphere myspherer, float psum, float lsum)
+__global__ void computeintensity(float* target, float* intens, idealsphere myspherer, int* psum, float* lsum)
 {
-  likelihood likelihooder = getObjects(myspherer, threadIdx.x, threadIdx.y, threadIdx.z + blockIdx.z * blockDim.z, blockIdx.x, blockIdx.y, lsum, psum);
-  float likelihood1 = thrust::reduce(thrust::device,
+  int zval = threadIdx.z + blockIdx.z * blockDim.z;
+  likelihood likelihooder = getObjects(myspherer, threadIdx.x, threadIdx.y, zval, blockIdx.x, blockIdx.y, lsum, psum);
+  float likelihood1 = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
 
@@ -222,6 +225,7 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
          H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
+//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -234,8 +238,9 @@ int main()
   H5::DataSpace lambdaSpace = lambdas.getSpace();
   H5::DataSpace photonSpace = photons.getSpace();
   
-  hsize_t count[3] = {1, NY, NX};
+  hsize_t count[3] = {BS, NY, NX};
   hsize_t offset[3] = {0, 0, 0};
+  hsize_t zerooffset[3] = {0, 0, 0};
   hsize_t fullsize[3];
   lambdaSpace.getSimpleExtentDims(fullsize);
 
@@ -262,6 +267,8 @@ int main()
   thrust::device_vector<float> dIntensity(BS * 32 * 32);
   thrust::host_vector<float> hIntensity(BS * 32 * 32);
   thrust::device_vector<float> dIntensity2(BS * 32 * 32);
+  thrust::device_vector<int> dpsum(BS);
+  thrust::device_vector<float> dlsum(BS);
   thrust::host_vector<float> hIntensity2(BS * 32 * 32);
 
   thrust::device_vector<cufftComplex> d_complexSpace(FY * FX);
@@ -277,15 +284,16 @@ int main()
   spherer.dPattern = dPattern.data();
   spherer.tid = tid;
   realsphere reals;
-  reals.sigma = 30;
+  reals.sigma = 12 + tid * 4;
 
   for (int img = 0; img < fullsize[0]; img+=BS)
     {
-	int end = min(fullsize[0], img + BS);
+      int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
 	count[0] = imgcount;
       offset[0] = img;
       lambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
+      memSpace.selectHyperslab(H5S_SELECT_SET, count, zerooffset);
 //      expectedLambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       lambdas.read(lambdaVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, lambdaSpace);
@@ -294,8 +302,12 @@ int main()
 	lambdaValsZero = lambdaVals;
       }     
       photons.read(photonVals.data(), H5::PredType::NATIVE_SHORT, memSpace, photonSpace);
-      int psum = 0;
-      double lsum = 0;
+      int psum[BS] = {0};
+      float lsum[BS] = {0};
+      for (int j = 0; j < imgcount; j++)
+	{
+	int dpsum = 0;
+	double dlsum = 0;
       for (int y = 0; y < NY; y++)
 	{
 	  for (int x = 0; x < NX; x++)
@@ -319,38 +331,54 @@ int main()
 		  !((x > 255 && x < 390 && y < 24 && y > 15)) &&
 		  !(y > 15 && x > 1 && x + y < 81))*/
 	      {
-		photonVals[y][x] = 0;
-		lambdaVals[y][x] = 0;
+		photonVals[j][y][x] = 0;
+		lambdaVals[j][y][x] = 0;
 	      }
 	      if ((y - 230) * (y-230) + (x-200) * (x-200) < 10000)
 	      {
-		photonVals[y][x] = 0;
-		lambdaVals[y][x] = 0;
+		photonVals[j][y][x] = 0;
+		lambdaVals[j][y][x] = 0;
 	      }
 
-	      psum += photonVals[y][x];
-	      lsum += lambdaVals[y][x];
+	      dpsum += photonVals[j][y][x];
+	      dlsum += lambdaVals[j][y][x];
 	    }
+	}
+	psum[j] = dpsum;
+	lsum[j] = dlsum;
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, 1);
+      dim3 grid(1, 1, imgcount);
       dim3 block(32, 32, 1);
+
+      int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
       spherer.baseoffsetx = NX / 2 - 10 - 15 - 0.5; // good val -10
       spherer.baseoffsety = NY / 2 + 10 - 11 - 0.5; // good val +10
-      dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
-      dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
+      dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
+      dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
 
-      float minval = 1e30;
-      float maxval = -1e30;
-      int maxidx = 0;
-      float maxint = 0;
-      int maxr = 0;
-      int maxdx = 0;
-      int maxdy = 0;
+      dlsum.assign(&lsum[0], &lsum[BS]);
+      dpsum.assign(&psum[0], &psum[BS]);
+
+
+      float minval[BS];
+      float maxval[BS];
+      int maxidx[BS];
+      float maxint[BS];
+      int maxr[BS];
+      int maxdx[BS];
+      int maxdy[BS];
+      fill(&maxdx[0], &maxdx[BS], 0);
+      fill(&maxdy[0], &maxdy[BS], 0);
+      fill(&maxr[0], &maxr[BS], 0);
+      fill(&maxint[0], &maxint[BS], 0);
+      fill(&maxidx[0], &maxidx[BS], 0);
+      fill(&minval[0], &minval[BS], 1e30);
+      fill(&maxval[0], &maxval[BS], -1e30);
       
       for (int r = 0; r < 1800; r+=5)
 	{
@@ -359,41 +387,48 @@ int main()
 	  //float r2 = r * 1.1e-4 * 0.1;
 	  float r2 = r * 0.1;
 	  reals.r = r2;
-	  for (int dx = 0; dx <= 2 * reals.sigma; dx+=8)
+	  for (int dx = 0; dx <= 6 * reals.sigma; dx+=reals.sigma * 0.75)
 	    {
-	      for (int dy = - 2 * reals.sigma; dy <= 2 * reals.sigma; dy+=8)
+	      for (int dy = -6 * reals.sigma; dy <= 6 * reals.sigma; dy+=reals.sigma * 0.75)
 		{
+		  if (dx == 0 && dy > 0) continue;
 		  reals.x = dx;
 		  reals.y = dy;
 		  thrust::tabulate(thrust::device, d_complexSpace.data(), d_complexSpace.data() + FX * FY, reals);
 		  cufftExecC2C(plan, d_complexSpace.data().get(), d_complexSpace.data().get(), CUFFT_FORWARD);
 		  thrust::transform(thrust::device, d_complexSpace.begin(), d_complexSpace.end(), dPattern.begin(), sqabser);
-		  computeintensity<<<grid, block>>>(dIntensity.data().get(), dIntensity2.data().get(), spherer, psum, lsum);
+		  computeintensity<<<grid, block>>>(dIntensity.data().get(), dIntensity2.data().get(), spherer, dpsum.data().get(), dlsum.data().get());
 		  hIntensity.assign(dIntensity.begin(), dIntensity.end());
 		  hIntensity2.assign(dIntensity2.begin(), dIntensity2.end());
 		  for (int k = 0; k < grid.y * block.y * grid.x * block.x * grid.z * block.z; k++)
 		    {
-		      if (hIntensity[k] > maxval)
+			int img = k / base;
+		      if (hIntensity[k] > maxval[img])
 			{
-			  maxval = hIntensity[k];
-			  maxint = hIntensity2[k];
-			  maxidx = k;
-			  maxr = r;
-			  maxdx = dx;
-			  maxdy = dy;
+			  maxval[img] = hIntensity[k];
+			  maxint[img] = hIntensity2[k];
+			  maxidx[img] = k % base;
+			  maxr[img] = r;
+			  maxdx[img] = dx;
+			  maxdy[img] = dy;
 			}
-		      if (hIntensity[k] < minval) minval = hIntensity[k];
+		      if (hIntensity[k] < minval[img]) minval[img] = hIntensity[k];
 		    }
 		}
 	    }
-        int maxR = /*maxidx / grid.y / block.y / grid.x / block.x*/ maxr;
-	int maxX = maxidx % block.x;
-	int maxY = (maxidx / (grid.x * block.x)) % block.y;
-	int maxI = (maxidx / (block.x * grid.x * block.y)) % grid.y;
-	int maxI2 = (maxidx / block.x) % grid.x;
-	printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d %d %d\n", img, psum, lsum, minval, maxval, hIntensity[0], maxR, maxX, maxY, cudaGetLastError(), maxint, maxI, maxI2, maxdx, maxdy); 
-      fflush(stdout);
+	  fprintf(stderr, "%d r: %d\n", img, r);
 	}
+	  for (int subimg = 0; subimg < imgcount; subimg++)
+	    {
+        int maxR = /*maxidx / grid.y / block.y / grid.x / block.x*/ maxr[subimg];
+	int maxX = maxidx[subimg] % block.x;
+	int maxY = (maxidx[subimg] / (grid.x * block.x)) % block.y;
+	int maxI = (maxidx[subimg] / (block.x * grid.x * block.y)) % grid.y;
+	int maxI2 = (maxidx[subimg] / block.x) % grid.x;
+	printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d %d %d\n", img + subimg, psum[subimg], lsum[subimg], minval[subimg], maxval[subimg], hIntensity[subimg * base], maxR, maxX, maxY, cudaGetLastError(), maxint[subimg], maxI, maxI2, maxdx[subimg], maxdy[subimg]); 
+	    }
+      fflush(stdout);
+
 
 
 

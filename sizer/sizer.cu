@@ -165,8 +165,8 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float lsum, float psum)
 {
   myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx) * 1.19 + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 1.19 + myspherer.baseoffsety);
+  myspherer.offsetx = (tx) * 1.0f + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 1.0f + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
@@ -236,7 +236,7 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -274,10 +274,14 @@ int main()
   thrust::device_vector<float> dLambdas(NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
+
+
   thrust::device_vector<float> dIntensity(175000000);
   thrust::host_vector<float> hIntensity(175000000);
   thrust::device_vector<float> dIntensity2(175000000);
   thrust::host_vector<float> hIntensity2(175000000);
+
+
 
   idealsphere spherer(dPhotons, dLambdas);
   char* taskid = getenv("SLURM_ARRAY_TASK_ID");
@@ -285,6 +289,7 @@ int main()
   sscanf(taskid, "%d", &tid);
   spherer.lfactor = 1.0 /** pow(1.01, (tid) - 64)*/;
   spherer.tid = tid;
+
 
   for (int img = 0; img < fullsize[0]; img++)
     {
@@ -310,17 +315,17 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 2790 && x < 393) &&
-	      !(x < 170 && x > 2 && y < 180 && y > 15) &&
-	      !(x < 290 && x > 254 && y < 120 && y > 15) &&
+	      if (x > 390 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 2790 && x < 390) &&
+	      !(x < 170 && x > 2 && y < 180 && y > 30) &&
+	      !(x < 290 && x > 254 && y < 120 && y > 30) &&
 	      !(x < 88 && x > 19 && y < 130 && y > 97)) &&
-	      !(x < 45 && x > 1 && y < 414 && y > 362) &&
-	      !(x > 252 && x < 393 && y < 411 && y > 234) &&
-	      !(x > 252 && x < 393 && y < 186 && y > 15))
+//	      !(x < 45 && x > 1 && y < 414 && y > 362) &&
+	      !(x > 252 && x < 390 && y < 411 && y > 234) &&
+	      !(x > 252 && x < 390 && y < 186 && y > 30))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
 	      /*if (!((x < 45 && x > 1 && y < 414 && y > 362)) &&
-	          !((x < 170 && x > 1 && y < 24 && y > 15)) &&
-		  !((x > 255 && x < 390 && y < 24 && y > 15)) &&
+	          !((x < 170 && x > 1 && y < 24 && y > 30)) &&
+		  !((x > 255 && x < 390 && y < 24 && y > 30)) &&
 		  !(y > 15 && x > 1 && x + y < 81))*/
 	      {
 		photonVals[y][x] = 0;
@@ -336,15 +341,16 @@ int main()
 	      lsum += lambdaVals[y][x];
 	    }
 	}
+
       
 //      if (psum - lsum < 2500) continue;
       dim3 grid(1, 1, 2700);
-      dim3 block(32, 32, 1);
+      dim3 block(28, 28, 1);
 
       spherer.rfactor = 0.0025;
       spherer.roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 15 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 11 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 11 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 10 - 7 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + NY * NX);
       
