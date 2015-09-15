@@ -18,19 +18,12 @@ const int NY = 414;
 
 const int FX = 2048;
 const int FY = 2048;
-const int BS = 32;
-
-__device__ __host__ float sinc(float val)
-{
-	if (val == 0) return 1;
-	return sinpif(val) / (val * CUDART_PI_F);
-}
+const int BS = 512;
 
 struct realsphere : public thrust::unary_function<int, cufftComplex>
 {
   float r;
   float sigma;
-  float sigmag;
   float x;
   float y;
 
@@ -57,15 +50,13 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     float gr = qx * qx + qy * qy;
 
 
-    float factor = (/*0.01f + 0.99f **/ expf(- gr / (2 * sigmag * sigmag)));
-    factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
+    float factor = (/*0.01f + 0.99f **/ expf(- gr / (2 * sigma * sigma)));
     //if (factor < 0.3f) factor = 0.3f;
     val.x = r2 * factor;
 
     return val;
   }
 };
-
 
 struct absfunc : public thrust::unary_function<cufftComplex, float>
 {
@@ -133,11 +124,6 @@ __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(sph
     if (!spherer.dLambdas[data]) return 0;
 
     float intensity = getIntensity(data);
-    // BAGLIVO STYLE!!!
-    if (spherer.dPhotons[data]) return 0;
-    return spherer.dPhotons[data] * log(intensity / spherer.dPhotons[data]);
-
-
     float val = 0;
     if (spherer.dPhotons[data])
 {   
@@ -181,7 +167,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
   myspherer.dLambdas = &myspherer.dLambdas[zval * NY * NX];
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
-//  myspherer.lfactor =  1.00 * pow(1.1f, -1.f + bx * 2.f);
+  //myspherer.lfactor =  1.00 * pow(1.04, bx - 2 * 0.5);
 //  myspherer.ebase = (0 + bx) * 1e-4;
   myspherer.ebase = -lsum[zval] * (myspherer.lfactor - 1) / 46215;
   myspherer.ebase = 0;
@@ -198,7 +184,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 intens[idx] = 0;*/
 //intensityfactor = 1e-13;
 }
-//  intensityfactor *= pow(1.1f, -1.f + bx * 2.f);
+//  intensityfactor *= pow(1.0075, myspherer.tid - 64 * 0.5);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -223,7 +209,7 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
   int zval = threadIdx.z + blockIdx.z * blockDim.z;
   likelihood likelihooder = getObjects(myspherer, threadIdx.x, threadIdx.y, zval, blockIdx.x, blockIdx.y, lsum, psum);
   float likelihood1 = -1e30f;
-  if (likelihooder.factor  < 2e-5)
+  if (likelihooder.factor * myspherer.tid * myspherer.tid * 4 < 16e-5)
   {
   likelihood1 = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
@@ -234,7 +220,7 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
 
   int idx =  (threadIdx.x + blockIdx.x * blockDim.x)  + (threadIdx.y + blockIdx.y * blockDim.y) * gridDim.x * blockDim.x + (threadIdx.z + blockIdx.z * blockDim.z)  * gridDim.x * blockDim.x * gridDim.y * blockDim.y;	
   target[idx] = likelihood1;
-  intens[idx] = likelihooder.factor /* * myspherer.tid * myspherer.tid * 4 */;
+  intens[idx] = likelihooder.factor * myspherer.tid * myspherer.tid * 4;
 }
 
 int main()
@@ -254,8 +240,8 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
-//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
+//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -314,13 +300,11 @@ int main()
   spherer.dPattern = dPattern.data();
   spherer.tid = tid;
   realsphere reals;
-  //  reals.sigma = /*12 + tid * 4*/ tid * 6;
-  reals.sigma = 80;
-  reals.sigmag = 30;
+  reals.sigma = /*12 + tid * 4*/ tid * 4;
   int rc = 0;
   for (int img = 0; img < fullsize[0]; img+=BS, rc++)
     {
-      if (rc % 12 != tid) continue;
+      //if (rc % 24 != tid) continue;
       int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
 	count[0] = imgcount;
@@ -352,10 +336,10 @@ int main()
 		lambdaVals[y][x] = 0;
 	      }*/
 	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 2790 && x < 393) &&
-	      !(x < 170 && x > 2 && y < 180 && y > 35) &&
-	      !(x < 290 && x > 254 && y < 120 && y > 35) &&
+	      !(x < 170 && x > 2 && y < 180 && y > 15) &&
+	      !(x < 290 && x > 254 && y < 120 && y > 15) &&
 	      !(x < 88 && x > 19 && y < 130 && y > 97)) &&
-//	      !(x < 45 && x > 1 && y < 414 && y > 362) &&
+	      !(x < 45 && x > 1 && y < 414 && y > 362) &&
 	      !(x > 252 && x < 393 && y < 411 && y > 234) &&
 	      !(x > 252 && x < 393 && y < 186 && y > 15))
 //	      if ((y < 233 || (x < 350 && y < 370) || x < 255))
@@ -383,13 +367,13 @@ int main()
       
 //      if (psum - lsum < 2500) continue;
       dim3 grid(1, 1, imgcount);
-      dim3 block(22, 22, 1);
+      dim3 block(19, 22, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 21 - 0.5; // good val -10
+      spherer.baseoffsetx = NX / 2 - 10 - 11 - 0.5; // good val -10
       spherer.baseoffsety = NY / 2 + 10 - 13 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
@@ -413,19 +397,17 @@ int main()
       fill(&minval[0], &minval[BS], 1e30);
       fill(&maxval[0], &maxval[BS], -1e30);
       
-      for (int r = 0; r < 1800; r++)
+      for (int r = 0; r < 2100; r+=5)
 	{
-	  if (r > 50) r += 4;
 	  if (r > 600) r += 5;
 	  if (r > 1200) r += 10;
 	  if (r > 1500) r += 20;
 	  //float r2 = r * 1.1e-4 * 0.1;
 	  float r2 = r * 0.1;
 	  reals.r = r2;
-	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.6 * reals.sigma; dx+=4)
+	  for (int dx = 0; dx <= 3 * reals.sigma; dx+=(reals.sigma + 3) * 0.25)
 	    {
-	      for (int dy = -0.6 * reals.sigma; dy <= 0.6 * reals.sigma; dy+= 4)
+	      for (int dy = -3 * reals.sigma; dy <= 3 * reals.sigma; dy+= (reals.sigma + 3) * 0.25)
 		{
 		  if (dx == 0 && dy > 0) continue;
 		  reals.x = dx;
