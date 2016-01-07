@@ -18,7 +18,7 @@ const int NY = 414;
 
 const int FX = 2048;
 const int FY = 2048;
-const int BS = 1;
+const int BS = 4;
 
 __device__ __host__ float sinc(float val)
 {
@@ -43,6 +43,7 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     cufftComplex val;
     val.y = 0.f;
 
+
     float r2 = r * r - qx * qx - qy * qy;
     if (r2 < 0.f)
     {
@@ -51,14 +52,21 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     }
     else
 	r2 = sqrt(r2);
+
     
     qx += x;
     qy += y;
+    //qy /= 1.8;
+    //qx /= 1.5;
+    //qx /= 1.8;
     float gr = qx * qx + qy * qy;
 
 
     float factor = (/*0.01f + 0.99f **/ expf(- gr / (2 * sigmag * sigmag)));
-    factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
+    //factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
+
+    //float factor = 1.0f;
+
     //if (factor < 0.3f) factor = 0.3f;
     val.x = r2 * factor;
 
@@ -183,8 +191,8 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
 //  myspherer.lfactor =  1.00 * pow(1.1f, -1.f + bx * 2.f);
   float fittedPhc = phc[zval * 3 + 2];
-  float minPhc = max(1e-5, -4 * sqrt(0.6 * fittedPhc) + 0.6 * fittedPhc);
-  float maxPhc = 4 * sqrt(1.4 * fittedPhc) + 1.4 * fittedPhc;
+  float minPhc = max(1e-5, -6 * sqrt(0.6 * fittedPhc) + 0.6 * fittedPhc);
+  float maxPhc = 6 * sqrt(1.4 * fittedPhc) + 1.4 * fittedPhc;
   myspherer.lfactor = (1.0f / phc[zval * 3]) * (minPhc + (maxPhc - minPhc) / 24 * bx); 
 //myspherer.lfactor = (1.0f / phc[zval * 3]) * (phc[zval * 3 + 2]); 
 //  myspherer.ebase = (0 + bx) * 1e-4;
@@ -195,16 +203,16 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
   float intensity = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), myspherer),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), myspherer));
-
-  float intensityfactor = (psum[zval] - lsum[zval] * myspherer.lfactor) / intensity;
+  float diff = (psum[zval] - lsum[zval] * myspherer.lfactor);
+  float intensityfactor = diff / intensity;
   if (intensity == 0) intensityfactor = 1e6f;
-  if (intensityfactor < 1e-13)
+  if (diff <= 0 || intensityfactor < 1e-17)
 {
 /*target[idx] = -1e10;
 intens[idx] = 0;*/
-intensityfactor = 1e-13;
+intensityfactor = 0;
 }
-//  intensityfactor *= pow(1.1f, -1.f + bx * 2.f);
+  intensityfactor *= pow(1.1f, -1.f + by * 2.f);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -229,7 +237,7 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
   int zval = threadIdx.z + blockIdx.z * blockDim.z;
   likelihood likelihooder = getObjects(myspherer, threadIdx.x, threadIdx.y, zval, blockIdx.x, blockIdx.y, lsum, psum, phc);
   float likelihood1 = -1e30f;
-//  if (likelihooder.factor  < 2e-5)
+  if (likelihooder.factor > 1e-17)
   {
   likelihood1 = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
@@ -261,8 +269,31 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV1/HITS4sigma.h5", H5F_ACC_RDONLY);
-         H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV1/photonCount.hdf5", H5F_ACC_RDONLY);
+/*         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV1/HITS4sigma.h5", H5F_ACC_RDONLY);
+	   H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV1/photonCount.hdf5", H5F_ACC_RDONLY);*/
+
+
+//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_TBSV/TBSV/HITS4sigma.h5", H5F_ACC_RDONLY);
+///scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII
+//RIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5"
+//         H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_TBSV/TBSV/photon_count.h5", H5F_ACC_RDONLY);
+///scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/
+///scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/
+// "/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_MS2/MS2_1/
+
+
+//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5", H5F_ACC_RDONLY);
+///scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII
+//RIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5"
+//         H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/photon_count.h5", H5F_ACC_RDONLY);
+
+
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/HITS4sigma.h5", H5F_ACC_RDONLY);
+///scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII
+//RIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5"
+         H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/photon_count.h5", H5F_ACC_RDONLY);
+
+
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
@@ -307,10 +338,10 @@ int main()
   thrust::device_vector<float> dLambdas(BS * NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
-  thrust::device_vector<float> dIntensity(BS * 24 * 32 * 32);
-  thrust::host_vector<float> hIntensity(BS * 24 * 32 * 32);
-  thrust::device_vector<float> dIntensity2(BS * 24 * 32 * 32);
-  thrust::host_vector<float> hIntensity2(BS * 24 * 32 * 32);
+  thrust::device_vector<float> dIntensity(BS * 3 * 48 * 32 * 32);
+  thrust::host_vector<float> hIntensity(BS * 3 * 48 * 32 * 32);
+  thrust::device_vector<float> dIntensity2(BS * 3 * 48 * 32 * 32);
+  thrust::host_vector<float> hIntensity2(BS * 3 * 48 * 32 * 32);
   thrust::device_vector<int> dpsum(BS);
   thrust::device_vector<float> dlsum(BS);
   thrust::host_vector<long long> hPhc(BS * 3);
@@ -335,7 +366,7 @@ int main()
   int rc = 0;
   for (int img = 0; img < fullsize[0]; img+=BS, rc++)
     {
-      if (rc % 64 != tid) continue;
+      if (rc % 96 != tid) continue;
       int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
 	count[0] = imgcount;
@@ -404,7 +435,7 @@ int main()
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(24, 1, imgcount);
+      dim3 grid(48, 3, imgcount);
       dim3 block(22, 22, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
@@ -436,9 +467,9 @@ int main()
       fill(&minval[0], &minval[BS], 1e30);
       fill(&maxval[0], &maxval[BS], -1e30);
       
-      for (int r = 0; r < 1800; r++)
+      for (int r = 0; r < 1200; r++)
 	{
-	  if (r > 50) r += 4;
+	  if (r > 350) r += 4;
 	  if (r > 600) r += 5;
 	  if (r > 1200) r += 10;
 	  if (r > 1500) r += 20;
@@ -451,6 +482,8 @@ int main()
 	      for (int dy = -0.6 * reals.sigma; dy <= 0.6 * reals.sigma; dy+= 4)
 		{
 		  if (dx == 0 && dy > 0) continue;
+/*		  int dx = 0;
+		  int dy = 0;*/
 		  reals.x = dx;
 		  reals.y = dy;
 		  thrust::tabulate(thrust::device, d_complexSpace.data(), d_complexSpace.data() + FX * FY, reals);
