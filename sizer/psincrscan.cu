@@ -63,7 +63,7 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
 
 
     float factor = (/*0.01f + 0.99f **/ expf(- gr / (2 * sigmag * sigmag)));
-    //factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
+    factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
 
     //float factor = 1.0f;
 
@@ -212,7 +212,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
 intens[idx] = 0;*/
 intensityfactor = 0;
 }
-  intensityfactor *= pow(1.1f, -1.f + by * 2.f);
+//  intensityfactor *= pow(1.1f, -1.f + by * 2.f);
   likelihood likelihooder(myspherer, intensityfactor);
 
   return likelihooder;
@@ -338,10 +338,10 @@ int main()
   thrust::device_vector<float> dLambdas(BS * NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
-  thrust::device_vector<float> dIntensity(BS * 3 * 48 * 32 * 32);
-  thrust::host_vector<float> hIntensity(BS * 3 * 48 * 32 * 32);
-  thrust::device_vector<float> dIntensity2(BS * 3 * 48 * 32 * 32);
-  thrust::host_vector<float> hIntensity2(BS * 3 * 48 * 32 * 32);
+  thrust::device_vector<float> dIntensity(BS * 1 * 48 * 32 * 32);
+  thrust::host_vector<float> hIntensity(BS * 1 * 48 * 32 * 32);
+  thrust::device_vector<float> dIntensity2(BS * 1 * 48 * 32 * 32);
+  thrust::host_vector<float> hIntensity2(BS * 1 * 48 * 32 * 32);
   thrust::device_vector<int> dpsum(BS);
   thrust::device_vector<float> dlsum(BS);
   thrust::host_vector<long long> hPhc(BS * 3);
@@ -435,7 +435,7 @@ int main()
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(48, 3, imgcount);
+      dim3 grid(48, 1, imgcount);
       dim3 block(22, 22, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
