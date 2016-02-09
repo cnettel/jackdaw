@@ -7,6 +7,7 @@
 #include <thrust/device_vector.h>
 #include <thrust/copy.h>
 #include <string>
+#include <set>
 #include "math_constants.h"
 
 using boost::multi_array;
@@ -18,7 +19,7 @@ const int NY = 414;
 
 const int FX = 2048;
 const int FY = 2048;
-const int BS = 4;
+const int BS = 2;
 
 __device__ __host__ float sinc(float val)
 {
@@ -63,7 +64,7 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
 
 
     float factor = (/*0.01f + 0.99f **/ expf(- gr / (2 * sigmag * sigmag)));
-    factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
+//    factor *= sinc(qx / sigma * 0.5) * sinc(qy / sigma * 0.5);
 
     //float factor = 1.0f;
 
@@ -349,8 +350,13 @@ int main()
 
   thrust::device_vector<cufftComplex> d_complexSpace(FY * FX);
   thrust::device_vector<float> dPattern(FY * FX);
-  cufftHandle plan;  
+  cufftHandle plan;
   cufftPlan2d(&plan, FX, FY, CUFFT_C2C);
+  cufftHandle sizePlan[4097];
+  for (int k = 1; k <= 4096; k++)
+    {
+      cufftPlan2d(&sizePlan[k], FX, FY, CUFFT_C2C);
+    }
 
   idealsphere spherer(dPhotons, dLambdas);
   char* taskid = getenv("SLURM_ARRAY_TASK_ID");
@@ -364,8 +370,21 @@ int main()
   reals.sigma = 80;
   reals.sigmag = 30;
   int rc = 0;
+  char tlf[255];
+  FILE* already = fopen("349126", "r");
+  set<int> alreadyset;
+  while (fgets(tlf, 255, already))
+    {
+      int v;
+      if (sscanf(tlf, "%d", &v) == 1)
+	{
+	  alreadyset.insert(v);
+	}
+    }
+
   for (int img = 0; img < fullsize[0]; img+=BS, rc++)
     {
+      if (alreadyset.find(img) != alreadyset.end()) continue;
       if (rc % 96 != tid) continue;
       int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
