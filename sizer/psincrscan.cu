@@ -14,12 +14,12 @@ using boost::multi_array;
 using boost::extents;
 using namespace std;
 
-const int NX = 414;
-const int NY = 414;
+const int NX = 400;
+const int NY = 400;
 
-const int FX = 2048;
-const int FY = 2048;
-const int BS = 2;
+const int FX = 4096;
+const int FY = 4096;
+const int BS = 4;
 
 __device__ __host__ float sinc(float val)
 {
@@ -59,7 +59,7 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     qy += y;
     //qy /= 1.8;
     //qx /= 1.5;
-    //qx /= 1.8;
+    qx /= 1.8;
     float gr = qx * qx + qy * qy;
 
 
@@ -106,8 +106,8 @@ struct idealsphere : public thrust::unary_function<int, float>
     int rawx = data % NX;
     int rawy = data / NX;
 
-    if (rawx < 211) rawx += 4;
-    if (rawy < 219) rawy += 4;
+    //if (rawx < 198) rawx += 4;
+    if (rawy < 215) rawy += 1;
     /*if (rawx < 211) rawx += 37;
     if (rawy < 219) rawy += 11;*/
 //    if (rawx < 233 - extrax * 3) rawx += /*29*/ -18 + extrax * 3;
@@ -183,21 +183,21 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float* lsum, int* psum, long long* phc)
 {
 //  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx * 2.f) /** 1.19f*/ + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 2.f /** 1.19f*/ + myspherer.baseoffsety);
+  myspherer.offsetx = (tx * 1.f) /** 1.19f*/ + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 1.f /** 1.19f*/ + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
   myspherer.dLambdas = &myspherer.dLambdas[zval * NY * NX];
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
-//  myspherer.lfactor =  1.00 * pow(1.1f, -1.f + bx * 2.f);
+  myspherer.lfactor =  1.00 * pow(1.15f, -0.f + bx);
+
   float fittedPhc = phc[zval * 3 + 2];
   float minPhc = max(1e-5, -6 * sqrt(0.6 * fittedPhc) + 0.6 * fittedPhc);
   float maxPhc = 6 * sqrt(1.4 * fittedPhc) + 1.4 * fittedPhc;
-  myspherer.lfactor = (1.0f / phc[zval * 3]) * (minPhc + (maxPhc - minPhc) / 24 * bx); 
+//  myspherer.lfactor = /*(1.0f / phc[zval * 3]) * (minPhc + (maxPhc - minPhc) / 24 * bx)*/ 1.0f; 
 //myspherer.lfactor = (1.0f / phc[zval * 3]) * (phc[zval * 3 + 2]); 
 //  myspherer.ebase = (0 + bx) * 1e-4;
-  myspherer.ebase = -lsum[zval] * (myspherer.lfactor - 1) / 46215;
   myspherer.ebase = 0;
 //    myspherer.lfactor = 1.0;
 
@@ -252,7 +252,7 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
   intens[idx] = likelihooder.factor /* * myspherer.tid * myspherer.tid * 4 */;
 }
 
-int main()
+int main(int argc, char** argv)
 {
 //    H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/Background_RNA/HITS_RNApol/ToFhits.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_MS2/ALL_runsRNApol_differentGainmapAndMask/HITS354/HITS.h5", H5F_ACC_RDONLY);
@@ -289,11 +289,12 @@ int main()
 //         H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/photon_count.h5", H5F_ACC_RDONLY);
 
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/HITS4sigma.h5", H5F_ACC_RDONLY);
+//  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/HITS4sigma.h5", H5F_ACC_RDONLY);
 ///scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII
 //RIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5"
-         H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/photon_count.h5", H5F_ACC_RDONLY);
-
+  //       H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/photon_count.h5", H5F_ACC_RDONLY);
+H5::H5File file(argv[1], H5F_ACC_RDONLY);
+H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
@@ -302,16 +303,20 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_70nmICO/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/12nm_SIM/HITS/HITS.h5", H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/20sizes_RNA/forCARL_PDB/HITS_PDB.h5", H5F_ACC_RDONLY);
-  H5::Group group = file.openGroup("with_geometry");
-  H5::DataSet lambdas = group.openDataSet("lambdas");
-  H5::DataSet photons = group.openDataSet("photon_count");
-  H5::DataSet phcframe = phcfile.openDataSet("phc");
+//  H5::Group group = file.openGroup("with_geometry");
+  H5::DataSet lambdas = file.openDataSet("lambdas");
+H5::DataSet poissonMask = maskfile.openDataSet("data");
+  H5::DataSet photons = file.openDataSet("phc");
+  //  H5::DataSet phcframe = phcfile.openDataSet("phc");
   H5::DataSpace lambdaSpace = lambdas.getSpace();
+  H5::DataSpace maskSpace = poissonMask.getSpace();
   H5::DataSpace photonSpace = photons.getSpace();
-  H5::DataSpace phcSpace = phcframe.getSpace();
+  //  H5::DataSpace phcSpace = phcframe.getSpace();
   
   hsize_t count[3] = {BS, NY, NX};
   hsize_t offset[3] = {0, 0, 0};
+  hsize_t maskcount[2] = {NY, NX};
+  hsize_t maskoffset[2] = {0, 0};
   hsize_t phcoffset[2] = {0, 0};
   hsize_t phccount[2] = {BS, 3};
   hsize_t zerooffset[3] = {0, 0, 0};
@@ -327,8 +332,10 @@ int main()
   lambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
 //  logLsSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
   photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
+  maskSpace.selectHyperslab(H5S_SELECT_SET, maskcount, maskoffset);
   H5::DataSpace memSpace(3, count);
-  H5::DataSpace phcMemSpace(2, phccount);
+  H5::DataSpace maskMemSpace(2, maskcount);
+  //  H5::DataSpace phcMemSpace(2, phccount);
 
   boost::multi_array<float, 3> lambdaVals(extents[BS][NY][NX]);
   boost::multi_array<float, 3> lambdaValsZero(extents[BS][NY][NX]);
@@ -339,24 +346,22 @@ int main()
   thrust::device_vector<float> dLambdas(BS * NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
-  thrust::device_vector<float> dIntensity(BS * 1 * 48 * 32 * 32);
-  thrust::host_vector<float> hIntensity(BS * 1 * 48 * 32 * 32);
-  thrust::device_vector<float> dIntensity2(BS * 1 * 48 * 32 * 32);
-  thrust::host_vector<float> hIntensity2(BS * 1 * 48 * 32 * 32);
+  boost::multi_array<int, 2> hMask(extents[NY][NX]);
+  thrust::device_vector<float> dIntensity(BS * 1 * 1 * 32 * 32);
+  thrust::host_vector<float> hIntensity(BS * 1 * 1 * 32 * 32);
+  thrust::device_vector<float> dIntensity2(BS * 1 * 1 * 32 * 32);
+  thrust::host_vector<float> hIntensity2(BS * 1 * 1 * 32 * 32);
   thrust::device_vector<int> dpsum(BS);
   thrust::device_vector<float> dlsum(BS);
-  thrust::host_vector<long long> hPhc(BS * 3);
+  //thrust::host_vector<long long> hPhc(BS * 3);
   thrust::device_vector<long long> dPhc(BS * 3);
 
   thrust::device_vector<cufftComplex> d_complexSpace(FY * FX);
   thrust::device_vector<float> dPattern(FY * FX);
+  
+  poissonMask.read(hMask.data(), H5::PredType::NATIVE_INT, maskMemSpace, maskSpace);
   cufftHandle plan;
   cufftPlan2d(&plan, FX, FY, CUFFT_C2C);
-  cufftHandle sizePlan[4097];
-  for (int k = 1; k <= 4096; k++)
-    {
-      cufftPlan2d(&sizePlan[k], FX, FY, CUFFT_C2C);
-    }
 
   idealsphere spherer(dPhotons, dLambdas);
   char* taskid = getenv("SLURM_ARRAY_TASK_ID");
@@ -367,25 +372,25 @@ int main()
   spherer.tid = tid;
   realsphere reals;
   //  reals.sigma = /*12 + tid * 4*/ tid * 6;
-  reals.sigma = 80;
-  reals.sigmag = 30;
+  reals.sigma = 160;
+  reals.sigmag = 60;
   int rc = 0;
   char tlf[255];
-  FILE* already = fopen("349126", "r");
+//  FILE* already = fopen("349126", "r");
   set<int> alreadyset;
-  while (fgets(tlf, 255, already))
+/*  while (fgets(tlf, 255, already))
     {
       int v;
       if (sscanf(tlf, "%d", &v) == 1)
 	{
 	  alreadyset.insert(v);
 	}
-    }
+    }*/
 
   for (int img = 0; img < fullsize[0]; img+=BS, rc++)
     {
       if (alreadyset.find(img) != alreadyset.end()) continue;
-      if (rc % 96 != tid) continue;
+      if (rc % 48 != tid) continue;
       int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
 	count[0] = imgcount;
@@ -396,17 +401,17 @@ int main()
       memSpace.selectHyperslab(H5S_SELECT_SET, count, zerooffset);
 //      expectedLambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
       photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
-      phcMemSpace.selectHyperslab(H5S_SELECT_SET, phccount, zerooffset);
-      phcSpace.selectHyperslab(H5S_SELECT_SET, phccount, phcoffset);
+      //phcMemSpace.selectHyperslab(H5S_SELECT_SET, phccount, zerooffset);
+      //phcSpace.selectHyperslab(H5S_SELECT_SET, phccount, phcoffset);
       lambdas.read(lambdaVals.data(), H5::PredType::NATIVE_FLOAT, memSpace, lambdaSpace);
       
       if (img == 0)
       {
 	lambdaValsZero = lambdaVals;
-      }     
+      }   
       photons.read(photonVals.data(), H5::PredType::NATIVE_SHORT, memSpace, photonSpace);
-      phcframe.read(hPhc.data(), H5::PredType::NATIVE_INT64, phcMemSpace, phcSpace);
-      fprintf(stderr, "%lld %lld %lld\n", hPhc[0], hPhc[1], hPhc[2]);
+      //phcframe.read(hPhc.data(), H5::PredType::NATIVE_INT64, phcMemSpace, phcSpace);
+      
       int psum[BS] = {0};
       float lsum[BS] = {0};
       for (int j = 0; j < imgcount; j++)
@@ -423,7 +428,7 @@ int main()
 		photonVals[y][x] = 0;
 		lambdaVals[y][x] = 0;
 	      }*/
-	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*/ (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 2790 && x < 393) &&
+	      /*	      if (x > 393 || y > 411 || (/*(x + y > 700) ||*//* (y < 235 || (x < 300 && y < 314) || x < 255)  && !(y < 183 && y > 15 && x > 2790 && x < 393) &&
 	      !(x < 170 && x > 2 && y < 180 && y > 35) &&
 	      !(x < 290 && x > 254 && y < 120 && y > 35) &&
 	      !(x < 88 && x > 19 && y < 130 && y > 97)) &&
@@ -435,15 +440,24 @@ int main()
 	          !((x < 170 && x > 1 && y < 24 && y > 15)) &&
 		  !((x > 255 && x < 390 && y < 24 && y > 15)) &&
 		  !(y > 15 && x > 1 && x + y < 81))*/
+/*	      {
+		photonVals[j][y][x] = 0;
+		lambdaVals[j][y][x] = 0;
+	      }*/
+	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
+	      ((y > 234 && x > 147) && (y < 336 && x < 239)))
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
 	      }
-	      if ((y - 230) * (y-230) + (x-200) * (x-200) < 10000)
-	      {
+
+	      if (photonVals[j][y][x] > 3)
+{	      
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
-	      }
+}	      
+	      photonVals[j][y][x] *= hMask[y][x];
+	      lambdaVals[j][y][x] *= hMask[y][x];
 
 	      dpsum += photonVals[j][y][x];
 	      dlsum += lambdaVals[j][y][x];
@@ -451,21 +465,23 @@ int main()
 	}
 	psum[j] = dpsum;
 	lsum[j] = dlsum;
+
+fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(48, 1, imgcount);
-      dim3 block(22, 22, 1);
+      dim3 grid(1, 1, imgcount);
+      dim3 block(31, 31, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 21 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 10 - 13 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 35 - 7 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 69 - 1 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
-      dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
+      //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
 
       dlsum.assign(&lsum[0], &lsum[BS]);
       dpsum.assign(&psum[0], &psum[BS]);
@@ -493,12 +509,12 @@ int main()
 	  if (r > 1200) r += 10;
 	  if (r > 1500) r += 20;
 	  //float r2 = r * 1.1e-4 * 0.1;
-	  float r2 = r * 0.1;
+	  float r2 = r * 0.2;
 	  reals.r = r2;
 	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.6 * reals.sigma; dx+=4)
+	  for (int dx = 0; dx <= 0.3 * reals.sigma; dx+=8)
 	    {
-	      for (int dy = -0.6 * reals.sigma; dy <= 0.6 * reals.sigma; dy+= 4)
+	      for (int dy = -0.3 * reals.sigma; dy <= 0.3 * reals.sigma; dy+= 8)
 		{
 		  if (dx == 0 && dy > 0) continue;
 /*		  int dx = 0;
