@@ -19,7 +19,7 @@ const int NY = 400;
 
 const int FX = 4096;
 const int FY = 4096;
-const int BS = 4;
+const int BS = 8;
 
 __device__ __host__ float sinc(float val)
 {
@@ -38,8 +38,8 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
   __host__ __device__ cufftComplex operator () (const int& data) {
     int rawx = data & (FX - 1);
     int rawy = data / FX;
-    float qx = rawx - x - FX * 0.5;
-    float qy = rawy - y - FY * 0.5;
+    float qx = rawx - x - FX * 0.5f;
+    float qy = rawy - y - FY * 0.5f;
 
     cufftComplex val;
     val.y = 0.f;
@@ -58,8 +58,8 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     qx += x;
     qy += y;
     //qy /= 1.8;
-    //qx /= 1.5;
-    qx /= 1.8;
+    qx /= 1.5;
+    // qx /= 1.8;
     float gr = qx * qx + qy * qy;
 
 
@@ -132,7 +132,7 @@ __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(sph
   __host__ __device__ float getIntensity(const int& data) {
   	float lbase = spherer.dLambdas[data] * spherer.lfactor;
 	lbase += spherer.ebase;
-	if (lbase < 1e-9) lbase = 1e-9;
+	if (lbase < 1e-9f) lbase = 1e-9f;
   	float intensity = spherer(data) * factor + lbase;
 
 	return intensity;
@@ -372,8 +372,8 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
   spherer.tid = tid;
   realsphere reals;
   //  reals.sigma = /*12 + tid * 4*/ tid * 6;
-  reals.sigma = 160;
-  reals.sigmag = 60;
+  reals.sigma = 210;
+  reals.sigmag = 80;
   int rc = 0;
   char tlf[255];
 //  FILE* already = fopen("349126", "r");
@@ -471,14 +471,14 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
       
 //      if (psum - lsum < 2500) continue;
       dim3 grid(1, 1, imgcount);
-      dim3 block(31, 31, 1);
+      dim3 block(26, 27, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 35 - 7 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 69 - 1 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 26 - 7 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 67 - 1 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
@@ -502,7 +502,7 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
       fill(&minval[0], &minval[BS], 1e30);
       fill(&maxval[0], &maxval[BS], -1e30);
       
-      for (int r = 0; r < 1200; r++)
+      for (int r = 0; r < 1000; r++)
 	{
 	  if (r > 350) r += 4;
 	  if (r > 600) r += 5;
@@ -512,9 +512,9 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  float r2 = r * 0.2;
 	  reals.r = r2;
 	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.3 * reals.sigma; dx+=8)
+	  for (int dx = 0; dx <= 0.4 * reals.sigma; dx+=4)
 	    {
-	      for (int dy = -0.3 * reals.sigma; dy <= 0.3 * reals.sigma; dy+= 8)
+	      for (int dy = -0.4 * reals.sigma; dy <= 0.4 * reals.sigma; dy+= 4)
 		{
 		  if (dx == 0 && dy > 0) continue;
 /*		  int dx = 0;
