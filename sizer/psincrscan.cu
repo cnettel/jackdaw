@@ -372,8 +372,8 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
   spherer.tid = tid;
   realsphere reals;
   //  reals.sigma = /*12 + tid * 4*/ tid * 6;
-  reals.sigma = 210;
-  reals.sigmag = 80;
+  reals.sigma = 160;
+  reals.sigmag = 60;
   int rc = 0;
   char tlf[255];
 //  FILE* already = fopen("349126", "r");
@@ -512,9 +512,9 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  float r2 = r * 0.2;
 	  reals.r = r2;
 	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.4 * reals.sigma; dx+=4)
+	  for (int dx = 0; dx <= 0.4 * reals.sigma; dx+=3)
 	    {
-	      for (int dy = -0.4 * reals.sigma; dy <= 0.4 * reals.sigma; dy+= 4)
+	      for (int dy = -0.4 * reals.sigma; dy <= 0.4 * reals.sigma; dy+= 3)
 		{
 		  if (dx == 0 && dy > 0) continue;
 /*		  int dx = 0;
