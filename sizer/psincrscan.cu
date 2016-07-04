@@ -390,7 +390,7 @@ H5::H5File file(argv[1], H5F_ACC_RDONLY);
   for (int img = 0; img < fullsize[0]; img+=BS, rc++)
     {
       if (alreadyset.find(img) != alreadyset.end()) continue;
-      if (rc % 48 != tid) continue;
+      if (rc % 74 != tid) continue;
       int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
 	count[0] = imgcount;
@@ -449,9 +449,9 @@ H5::H5File file(argv[1], H5F_ACC_RDONLY);
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
-	      }
+	      }*/
 
-	      if (photonVals[j][y][x] > 3)
+	      /*if (photonVals[j][y][x] > 3)
 {	      
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
@@ -502,7 +502,7 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
       fill(&minval[0], &minval[BS], 1e30);
       fill(&maxval[0], &maxval[BS], -1e30);
       
-      for (int r = 0; r < 1000; r++)
+      for (int r = 0; r < 80; r++)
 	{
 	  if (r > 350) r += 4;
 	  if (r > 600) r += 5;
@@ -512,9 +512,9 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  float r2 = r * 0.2;
 	  reals.r = r2;
 	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.4 * reals.sigma; dx+=16)
+	  for (int dx = 0; dx <= 0.5 * reals.sigma; dx+=10)
 	    {
-	      for (int dy = -0.4 * reals.sigma; dy <= 0.4 * reals.sigma; dy+= 16)
+	      for (int dy = -0.5 * reals.sigma; dy <= 0.5 * reals.sigma; dy+= 10)
 		{
 		  if (dx == 0 && dy > 0) continue;
 /*		  int dx = 0;
