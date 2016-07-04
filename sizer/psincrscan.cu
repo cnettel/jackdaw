@@ -14,12 +14,12 @@ using boost::multi_array;
 using boost::extents;
 using namespace std;
 
-const int NX = 400;
-const int NY = 400;
+const int NX = 1056;
+const int NY = 1027;
 
 const int FX = 4096;
 const int FY = 4096;
-const int BS = 8;
+const int BS = 1;
 
 __device__ __host__ float sinc(float val)
 {
@@ -107,7 +107,7 @@ struct idealsphere : public thrust::unary_function<int, float>
     int rawy = data / NX;
 
     //if (rawx < 198) rawx += 4;
-    if (rawy < 215) rawy += 1;
+    //if (rawy < 215) rawy += 1;
     /*if (rawx < 211) rawx += 37;
     if (rawy < 219) rawy += 11;*/
 //    if (rawx < 233 - extrax * 3) rawx += /*29*/ -18 + extrax * 3;
@@ -294,7 +294,7 @@ int main(int argc, char** argv)
 //RIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5"
   //       H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/photon_count.h5", H5F_ACC_RDONLY);
 H5::H5File file(argv[1], H5F_ACC_RDONLY);
-H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
+//H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
@@ -305,11 +305,11 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 //  H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/20sizes_RNA/forCARL_PDB/HITS_PDB.h5", H5F_ACC_RDONLY);
 //  H5::Group group = file.openGroup("with_geometry");
   H5::DataSet lambdas = file.openDataSet("lambdas");
-H5::DataSet poissonMask = maskfile.openDataSet("data");
-  H5::DataSet photons = file.openDataSet("phc");
+  //H5::DataSet poissonMask = maskfile.openDataSet("data");
+  H5::DataSet photons = file.openDataSet("data");
   //  H5::DataSet phcframe = phcfile.openDataSet("phc");
   H5::DataSpace lambdaSpace = lambdas.getSpace();
-  H5::DataSpace maskSpace = poissonMask.getSpace();
+//  H5::DataSpace maskSpace = poissonMask.getSpace();
   H5::DataSpace photonSpace = photons.getSpace();
   //  H5::DataSpace phcSpace = phcframe.getSpace();
   
@@ -332,7 +332,7 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
   lambdaSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
 //  logLsSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
   photonSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
-  maskSpace.selectHyperslab(H5S_SELECT_SET, maskcount, maskoffset);
+//  maskSpace.selectHyperslab(H5S_SELECT_SET, maskcount, maskoffset);
   H5::DataSpace memSpace(3, count);
   H5::DataSpace maskMemSpace(2, maskcount);
   //  H5::DataSpace phcMemSpace(2, phccount);
@@ -346,7 +346,7 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
   thrust::device_vector<float> dLambdas(BS * NY * NX);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
-  boost::multi_array<int, 2> hMask(extents[NY][NX]);
+  //  boost::multi_array<int, 2> hMask(extents[NY][NX]);
   thrust::device_vector<float> dIntensity(BS * 1 * 1 * 32 * 32);
   thrust::host_vector<float> hIntensity(BS * 1 * 1 * 32 * 32);
   thrust::device_vector<float> dIntensity2(BS * 1 * 1 * 32 * 32);
@@ -359,7 +359,7 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
   thrust::device_vector<cufftComplex> d_complexSpace(FY * FX);
   thrust::device_vector<float> dPattern(FY * FX);
   
-  poissonMask.read(hMask.data(), H5::PredType::NATIVE_INT, maskMemSpace, maskSpace);
+  //  poissonMask.read(hMask.data(), H5::PredType::NATIVE_INT, maskMemSpace, maskSpace);
   cufftHandle plan;
   cufftPlan2d(&plan, FX, FY, CUFFT_C2C);
 
@@ -444,7 +444,7 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
 	      }*/
-	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
+/*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))
 	      {
 		photonVals[j][y][x] = 0;
@@ -455,9 +455,9 @@ H5::DataSet poissonMask = maskfile.openDataSet("data");
 {	      
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
-}	      
-	      photonVals[j][y][x] *= hMask[y][x];
-	      lambdaVals[j][y][x] *= hMask[y][x];
+		}*/	      
+	      //	      photonVals[j][y][x] *= hMask[y][x];
+	      //	      lambdaVals[j][y][x] *= hMask[y][x];
 
 	      dpsum += photonVals[j][y][x];
 	      dlsum += lambdaVals[j][y][x];
@@ -477,8 +477,8 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 26 - 7 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 67 - 1 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 18 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 + 24 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
@@ -512,9 +512,9 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  float r2 = r * 0.2;
 	  reals.r = r2;
 	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.4 * reals.sigma; dx+=3)
+	  for (int dx = 0; dx <= 0.4 * reals.sigma; dx+=16)
 	    {
-	      for (int dy = -0.4 * reals.sigma; dy <= 0.4 * reals.sigma; dy+= 3)
+	      for (int dy = -0.4 * reals.sigma; dy <= 0.4 * reals.sigma; dy+= 16)
 		{
 		  if (dx == 0 && dy > 0) continue;
 /*		  int dx = 0;
