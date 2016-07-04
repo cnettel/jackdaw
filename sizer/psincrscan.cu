@@ -183,14 +183,14 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float* lsum, int* psum, long long* phc)
 {
 //  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx * 4.f) /** 1.19f*/ + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 4.f /** 1.19f*/ + myspherer.baseoffsety);
-  myspherer.extrax = bx;
-  myspherer.extray = by;
+  myspherer.offsetx = ((bx*32 + tx) * 1.f) /** 1.19f*/ + myspherer.baseoffsetx;
+  myspherer.offsety = ((by*32 + ty) * 1.f /** 1.19f*/ + myspherer.baseoffsety);
+  myspherer.extrax = /*bx*/0;
+  myspherer.extray = /*by*/0;
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
   myspherer.dLambdas = &myspherer.dLambdas[zval * NY * NX];
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
-  myspherer.lfactor =  1.00 * pow(1.15f, -0.f + bx);
+  myspherer.lfactor =  1.00 * pow(1.15f, -0.f /*+ bx*/);
 
   float fittedPhc = phc[zval * 3 + 2];
   float minPhc = max(1e-5, -6 * sqrt(0.6 * fittedPhc) + 0.6 * fittedPhc);
@@ -471,8 +471,8 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, imgcount);
-      dim3 block(31, 31, 1);
+      dim3 grid(5, 5, imgcount);
+      dim3 block(32, 32, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
@@ -549,10 +549,10 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  for (int subimg = 0; subimg < imgcount; subimg++)
 	    {
         int maxR = /*maxidx / grid.y / block.y / grid.x / block.x*/ maxr[subimg];
-	int maxX = maxidx[subimg] % block.x;
-	int maxY = (maxidx[subimg] / (grid.x * block.x)) % block.y;
-	int maxI = (maxidx[subimg] / (block.x * grid.x * block.y)) % grid.y;
-	int maxI2 = (maxidx[subimg] / block.x) % grid.x;
+	int maxX = maxidx[subimg] % (block.x * grid.x);
+	int maxY = (maxidx[subimg] / (grid.x * block.x)) % (block.y * grid.y);
+	int maxI = /*(maxidx[subimg] / (block.x * grid.x * block.y)) % grid.y*/0;
+	int maxI2 = /*(maxidx[subimg] / block.x) % grid.x*/0;
 	printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d %d %d\n", img + subimg, psum[subimg], lsum[subimg], minval[subimg], maxval[subimg], hIntensity[subimg * base], maxR, maxX, maxY, cudaGetLastError(), maxint[subimg], maxI, maxI2, maxdx[subimg], maxdy[subimg]); 
 	    }
       fflush(stdout);
