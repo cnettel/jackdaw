@@ -445,11 +445,12 @@ H5::H5File file(argv[1], H5F_ACC_RDONLY);
 		lambdaVals[j][y][x] = 0;
 	      }*/
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
-	      ((y > 234 && x > 147) && (y < 336 && x < 239)))
+	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
+	      if ( y < 515 || y > 969 || x > 790 || lambdavals[j][y][x] < 1e-20)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
-	      }*/
+	      }
 
 	      /*if (photonVals[j][y][x] > 3)
 {	      
