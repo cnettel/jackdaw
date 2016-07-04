@@ -294,7 +294,7 @@ int main(int argc, char** argv)
 //RIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_RNAPII/RNAPII/HITS4sigma.h5"
   //       H5::H5File phcfile("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/Run_OmRV/OmRV/photon_count.h5", H5F_ACC_RDONLY);
 H5::H5File file(argv[1], H5F_ACC_RDONLY);
-//H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
+H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
