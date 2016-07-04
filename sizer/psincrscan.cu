@@ -183,8 +183,8 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float* lsum, int* psum, long long* phc)
 {
 //  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx * 1.f) /** 1.19f*/ + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 1.f /** 1.19f*/ + myspherer.baseoffsety);
+  myspherer.offsetx = (tx * 4.f) /** 1.19f*/ + myspherer.baseoffsetx;
+  myspherer.offsety = (ty * 4.f /** 1.19f*/ + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
@@ -478,8 +478,8 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 18 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 24 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 34 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 - 10 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
@@ -503,7 +503,7 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
       fill(&minval[0], &minval[BS], 1e30);
       fill(&maxval[0], &maxval[BS], -1e30);
       
-      for (int r = 0; r < 80; r++)
+      for (int r = 0; r < 350; r++)
 	{
 	  if (r > 350) r += 4;
 	  if (r > 600) r += 5;
@@ -513,9 +513,9 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  float r2 = r * 0.2;
 	  reals.r = r2;
 	  spherer.r = r2;
-	  for (int dx = 0; dx <= 0.5 * reals.sigma; dx+=40)
+	  for (int dx = 0; dx <= 0 * 0.5 * reals.sigma; dx+=40)
 	    {
-	      for (int dy = -0.5 * reals.sigma; dy <= 0.5 * reals.sigma; dy+= 40)
+	      for (int dy = 0 * -0.5 * reals.sigma; dy <= 0 * 0.5 * reals.sigma; dy+= 40)
 		{
 		  if (dx == 0 && dy > 0) continue;
 /*		  int dx = 0;
