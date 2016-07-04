@@ -471,15 +471,15 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(5, 5, imgcount);
+      dim3 grid(7, 7, imgcount);
       dim3 block(32, 32, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 42 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 + 2 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 80 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 - 80 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
