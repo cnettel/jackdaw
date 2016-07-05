@@ -446,7 +446,7 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 	      }*/
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
-	      if ( (y < 515 && x > 512) || y < 30 || y > 515 || y > 969 || x > 790 || lambdaVals[j][y][x] < 1e-20)
+	      if ( y < 515 || y > 969 || x > 512 || lambdaVals[j][y][x] < 1e-20)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
