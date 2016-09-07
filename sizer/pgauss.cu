@@ -18,7 +18,7 @@ const int NY = 414;
 
 const int FX = 2048;
 const int FY = 2048;
-const int BS = 256;
+const int BS = 512;
 
 struct realsphere : public thrust::unary_function<int, cufftComplex>
 {
@@ -33,17 +33,27 @@ struct realsphere : public thrust::unary_function<int, cufftComplex>
     float qx = rawx - x - FX * 0.5;
     float qy = rawy - y - FY * 0.5;
 
-    float r2 = r * r - qx * qx - qy * qy;
-    if (r2 < 0.f) r2 = 0.f;
+    cufftComplex val;
+    val.y = 0.f;
 
-    r2 = sqrt(r2);
+    float r2 = r * r - qx * qx - qy * qy;
+    if (r2 < 0.f)
+    {
+	val.x = 0.f;
+	return val;
+    }
+    else
+	r2 = sqrt(r2);
     
     qx += x;
     qy += y;
     float gr = qx * qx + qy * qy;
-    cufftComplex val;
-    val.y = 0.f;
-    val.x = r2 * (0.01f + 0.99f * expf(- gr / (2 * sigma * sigma))); 
+
+
+    float factor = (/*0.01f + 0.99f **/ expf(- gr / (2 * sigma * sigma)));
+    //if (factor < 0.3f) factor = 0.3f;
+    val.x = r2 * factor;
+
     return val;
   }
 };
@@ -150,8 +160,8 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float* lsum, int* psum)
 {
 //  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = (tx) * 1.19f + myspherer.baseoffsetx;
-  myspherer.offsety = (ty * 1.19f + myspherer.baseoffsety);
+  myspherer.offsetx = (tx) /** 1.19f*/ + myspherer.baseoffsetx;
+  myspherer.offsety = (ty /** 1.19f*/ + myspherer.baseoffsety);
   myspherer.extrax = bx;
   myspherer.extray = by;
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
@@ -198,9 +208,15 @@ __global__ void computeintensity(float* target, float* intens, idealsphere mysph
 {
   int zval = threadIdx.z + blockIdx.z * blockDim.z;
   likelihood likelihooder = getObjects(myspherer, threadIdx.x, threadIdx.y, zval, blockIdx.x, blockIdx.y, lsum, psum);
-  float likelihood1 = thrust::reduce(thrust::seq,
+  float likelihood1 = -1e30f;
+//  if (likelihooder.factor < 0.5e-5)
+  {
+  likelihood1 = thrust::reduce(thrust::seq,
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(0), likelihooder),
 				   thrust::make_transform_iterator(thrust::make_counting_iterator(NY * NX), likelihooder));
+  }
+ 
+
 
   int idx =  (threadIdx.x + blockIdx.x * blockDim.x)  + (threadIdx.y + blockIdx.y * blockDim.y) * gridDim.x * blockDim.x + (threadIdx.z + blockIdx.z * blockDim.z)  * gridDim.x * blockDim.x * gridDim.y * blockDim.y;	
   target[idx] = likelihood1;
@@ -224,8 +240,8 @@ int main()
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/May2013_RNApol/ADUsim_RDV/HITS.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRVdata1/HITS.h5", H5F_ACC_RDONLY);
 
-         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
-//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
+//         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII_1/HITS3sigma.h5", H5F_ACC_RDONLY);
+         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/OmRV/HITS3sigma.h5", H5F_ACC_RDONLY);
 //         H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITSbackgrand.h5", H5F_ACC_RDONLY);
 
 //           H5::H5File file("/scratch/fhgfs/alberto/MPI/TODO/EXPERIMENTAL/MASK_90000px/CodeCleanUp/stathitf/RNAPII/HITS.h5", H5F_ACC_RDONLY);
@@ -284,10 +300,11 @@ int main()
   spherer.dPattern = dPattern.data();
   spherer.tid = tid;
   realsphere reals;
-  reals.sigma = 12 + tid * 4;
-
-  for (int img = 0; img < fullsize[0]; img+=BS)
+  reals.sigma = /*12 + tid * 4*/ tid * 4;
+  int rc = 0;
+  for (int img = 0; img < fullsize[0]; img+=BS, rc++)
     {
+      //if (rc % 24 != tid) continue;
       int end = min((int) fullsize[0], img + BS);
 	int imgcount = end - img;
 	count[0] = imgcount;
@@ -350,7 +367,7 @@ int main()
       
 //      if (psum - lsum < 2500) continue;
       dim3 grid(1, 1, imgcount);
-      dim3 block(32, 32, 1);
+      dim3 block(23, 19, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
@@ -387,9 +404,9 @@ int main()
 	  //float r2 = r * 1.1e-4 * 0.1;
 	  float r2 = r * 0.1;
 	  reals.r = r2;
-	  for (int dx = 0; dx <= 6 * reals.sigma; dx+=reals.sigma * 0.75)
+	  for (int dx = 0; dx <= 3 * reals.sigma; dx+=5)
 	    {
-	      for (int dy = -6 * reals.sigma; dy <= 6 * reals.sigma; dy+=reals.sigma * 0.75)
+	      for (int dy = -3 * reals.sigma; dy <= 3 * reals.sigma; dy+=5)
 		{
 		  if (dx == 0 && dy > 0) continue;
 		  reals.x = dx;

@@ -202,7 +202,7 @@ end:;
 
 	double calc(const column_vector& shortData)
 	{
-	  dofft(shortData);
+	  dofft(shortData);	  
 
 	  double val = thrust::transform_reduce(thrust::make_zip_iterator(thrust::make_tuple(t_truePattern, t_mask, t_data)),
 						thrust::make_zip_iterator(thrust::make_tuple(&t_truePattern[SIDE * SIDE], &t_mask[SIDE * SIDE], &t_data[SIDE * SIDE])), likelihooder,
@@ -248,10 +248,8 @@ struct derivator
   derivator(evaluator& eval1) : eval1(eval1) {}
   const column_vector operator() (const column_vector& shortData) const
   {
-    eval1.dofft(shortData);
-    column_vector shortData2;
+    //eval1.dofft(shortData);
     column_vector toReturn;
-    shortData2.set_size(shortData.size());
     toReturn.set_size(shortData.size());
     for (int k = 0; k < elem_count; k++)
       {

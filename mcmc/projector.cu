@@ -250,10 +250,12 @@ struct derivator
   {
     //eval1.dofft(shortData);
     column_vector toReturn;
+    column_vector shortData2;
     toReturn.set_size(shortData.size());
+    shortData2.set_size(shortData.size());
     for (int k = 0; k < elem_count; k++)
       {
-	shortData2(k) = 0;
+	shortData2(k) = shortData(k)
       }
     for (int k = 0; k < elem_count; k++)
       {

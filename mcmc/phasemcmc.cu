@@ -574,7 +574,8 @@ double __device__ likelihood(int count, int mask, cufftComplex val)
 	}
 	else
 	{
-		term += log(val2) * count - val2;
+	  //term += log(val2) * count - val2;
+	  term += (val2 - count) * (val2 - count);
 	}
 	term -= fabs(val.y) * 1;
 	term -= 34154;
