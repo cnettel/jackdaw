@@ -16,12 +16,12 @@ x2(end-hs+1:end, end-hs+1:end) = x(side1-hs+1:side1, side1-hs+1:side1);
 
 x = fft2(x2);
 y = 1/side2 * real(x(indices));
-y = y .* filter(:);
+y = y(:) .* filter(:);
 
 case 2,
 x2 = zeros(side2,side2);
 x2(indices) = real(x(:));
-x2 = x2 .* filter;
+x2(:) = x2(:) .* filter(:);
 x2 = ifft2(x2);
 x = x2;
 x2 = zeros(side1, side1);

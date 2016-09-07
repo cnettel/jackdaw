@@ -1,6 +1,6 @@
 function [f] = diffpoisson(l,y,diffy,mask)
 nonzeroy = max(y,1e-14);
-f = @(varargin)diff_func(l,nonzeroy,diffy, mask,varargin{:});
+f = @(varargin)diff_func(l,nonzeroy,diffy, varargin{:});
 
 
 function [v,x] = diff_func(l, y, diffy, x, t)
@@ -24,7 +24,7 @@ end
 xb = [x1' ; x2'];
 [~,b] = max(xb);
 
-index = (b - 1) + (1:length(x)) * 2 - 1;
+index = (b - 1) + (1:length(b)) * 2 - 1;
 
 x(mask) = xb(index)';
 
