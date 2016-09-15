@@ -1,10 +1,11 @@
 function [f] = diffpoisson(l,y,diffy,mask)
 nonzeroy = max(y,1e-14);
-f = @(varargin)diff_func(l,nonzeroy,diffy, varargin{:});
-
-
-function [v,x] = diff_func(l, y, diffy, x, t)
 mask = ~(y<0 | isnan(y));
+nonzeroy(~mask) = y(~mask);
+f = @(varargin)diff_func(l,mask,nonzeroy,diffy, varargin{:});
+
+
+function [v,x] = diff_func(l, mask, y, diffy, x, t)
 x1 = x(mask);
 x2 = x(mask);
 
@@ -12,8 +13,8 @@ if nargin > 4 && t > 0
     t = 1./t;
     % Solving the quadratic system for the derivative of the proximal
     % operator definition being 0.
-    acbcone = t * (diffy - x1) + l;
-    factor = -((diffy .* x1 .* t + (y(mask) - diffy(mask).*l)));
+    acbcone = t * (diffy(mask) - x1) + l(mask);
+    factor = -((diffy(mask) .* x1 .* t + (y(mask) - diffy(mask).*l(mask))));
     
     x1 = -(acbcone + sign(acbcone) .* (sqrt(-4 .* t .* factor + acbcone.^2)))/(2*t);
     x2 = factor ./ (t .* x1);
@@ -33,5 +34,5 @@ x(mask) = xb(index)';
 % are still positive.
 x = max(x, -diffy+2*eps(diffy));
 
-vals = -(y(mask) .* (log((x(mask) + diffy(mask)) ./ diffy(mask))) - l.*x(mask));
+vals = -(y(mask) .* (log((x(mask) + diffy(mask)) ./ diffy(mask))) - l(mask).*x(mask));
 v = sum(vals);
