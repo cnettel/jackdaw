@@ -10,7 +10,7 @@ x1 = x(mask);
 x2 = x(mask);
 
 if nargin > 4 && t > 0
-    t = 1./t;
+    t = 1./t * 0.5;
     % Solving the quadratic system for the derivative of the proximal
     % operator definition being 0.
     acbcone = t * (diffy(mask) - x1) + l(mask);
