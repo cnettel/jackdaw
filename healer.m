@@ -1,6 +1,6 @@
 function [outpattern, details] = healer(pattern, support, lambdas, initguess, maxdiff, relmumasked, z0)
 
-numrounds = 60;
+numrounds = 1;
 indices = 1:numel(pattern)';
 % Everything needs to be square and the same dimension
 side2 = size(pattern,1);
@@ -12,13 +12,13 @@ opts.tol = 1e-11;
 opts.maxmin = -1;
 opts.debug = 0;
 opts.restart = 5000;
-opts.maxIts = 2000;
+opts.maxIts = 200000;
 opts.countOps = 1;
 %opts.cntr_reset = 0;
 opts.stopCrit = 3;
 opts.printStopCrit = 1;
 opts.continuation = 1;
-opts.printEvery = 1;
+opts.printEvery = 10; 
 
 copts = continuation;
 copts.maxIts = 1;
@@ -36,19 +36,23 @@ onefilter = ones(side2, side2);
 
 ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,onefilter));
 x = reshape(initguess, side2 * side2, 1);
-betanow = 1e-4;
+betanow = 1;
 
 for outerround=1:numrounds
     outerround
     diffx = x;
     
     patternmask = (pattern < 0 | isnan(pattern));
-    filter = 1./sqrt(max(x(:),1e-15)) + 0.00001;
+    truebild = pattern;
+    truebild(patternmask) = x(patternmask);
+    filter = 1./sqrt(max(truebild(:)+1,1e-15)) + 0.00001;
     filter = 1./filter;
-    filter = filter + sqrt(0.1);
+    %filter = filter + sqrt(0.1);
+    %filter(:) = 1;
     filter = filter .* (1 - (1 - 1./sqrt(relmumasked)) * patternmask);
     filter = filter .* side2 .* side2 ./ sum(filter(:));
     filter = reshape(filter,side2*side2,1);
+    %filter(:) = 1;
     smoothop = diffpoisson(filter, pattern(:), (diffx(:) + lambdas(:)).* 1 ./ filter);    
 
     ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,filter));
@@ -59,7 +63,7 @@ for outerround=1:numrounds
     l = -diffxt;
     l(x2 > 0) = -maxdiff;
 
-    [x,out] = tfocs_SCD(smoothop, {linop_adjoint(ourlinp),0*diffxt+1e-300}, {prox_boxDual(l, u, -1)}, betanow, 0, z0, opts, copts);
+    [x,out] = tfocs_SCD(smoothop, {linop_adjoint(ourlinp),0*diffxt+1e-300}, {prox_boxDual(l, u, -1)}, betanow, 0, [], opts, copts);
     z0 = out.dual;
 
     x = x .* filter;
