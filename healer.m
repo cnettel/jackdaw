@@ -11,7 +11,7 @@ opts.alg = 'AT';
 opts.tol = 1e-11;
 opts.maxmin = -1;
 opts.debug = 0;
-opts.restart = 5000;
+opts.restart = 200000;
 opts.maxIts = 200000;
 opts.countOps = 1;
 %opts.cntr_reset = 0;
@@ -53,7 +53,7 @@ for outerround=1:numrounds
     filter = filter .* side2 .* side2 ./ sum(filter(:));
     filter = reshape(filter,side2*side2,1);
     %filter(:) = 1;
-    smoothop = diffpoisson(filter, pattern(:), (diffx(:) + lambdas(:)).* 1 ./ filter);    
+    smoothop = diffpoisson(filter, pattern(:), (diffx(:) + lambdas(:)).* 1 ./ filter, lambdas(:) * 1./filter);    
 
     ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,filter));
     diffxt = ourlinpflat(diffx, 2);

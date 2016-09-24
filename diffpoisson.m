@@ -1,11 +1,11 @@
-function [f] = diffpoisson(l,y,diffy,mask)
+function [f] = diffpoisson(l,y,diffy,minval)
 nonzeroy = max(y,1e-14);
 mask = ~(y<0 | isnan(y));
 nonzeroy(~mask) = y(~mask);
-f = @(varargin)diff_func(l,mask,nonzeroy,diffy, varargin{:});
+f = @(varargin)diff_func(l,mask,nonzeroy,diffy, minval, varargin{:});
 
 
-function [v,x] = diff_func(l, mask, y, diffy, x, t)
+function [v,x] = diff_func(l, mask, y, diffy, minval, x, t)
 x1 = x(mask);
 x2 = x(mask);
 
@@ -65,7 +65,7 @@ x(mask) = xb(index)';
 % Avoid singularities by moving away from zero
 % This step will also ensure that those x values that are not in the mask
 % are still positive.
-x = max(x, -diffy+2*epsval);
+x = max(x, -diffy+2*epsval+minval);
 
 vals = -(y(mask) .* (log((x(mask) + diffy(mask)) ./ diffy(mask))) - l(mask).*x(mask));
 v = sum(vals);
