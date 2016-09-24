@@ -14,8 +14,8 @@ using boost::multi_array;
 using boost::extents;
 using namespace std;
 
-const int NX = 1056;
-const int NY = 1027;
+const int NX = 1027;
+const int NY = 1056;
 
 const int FX = 4096;
 const int FY = 4096;
@@ -446,7 +446,7 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 	      }*/
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
-	      if (/* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
+	      if ((x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
