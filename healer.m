@@ -25,7 +25,7 @@ copts.maxIts = 1;
 copts.muDecrement = 1;
 copts.innerTol = 1e-11;
 copts.tol = 1e-11;
-copts.betaTol = 1;
+copts.betaTol = 1e2;
 copts.accel = 1;
 copts.innerMaxIts = 10000;
 
