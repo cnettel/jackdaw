@@ -19,7 +19,7 @@ const int NY = 1056;
 
 const int FX = 4096;
 const int FY = 4096;
-const int BS = 1;
+const int BS = 4;
 
 __device__ __host__ float sinc(float val)
 {
@@ -446,7 +446,7 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 	      }*/
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
-	      if ((x > 505 || y > 505) || /*(x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
+	      if (/*(x > 505 || y > 505) || */(x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
@@ -471,15 +471,15 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(10, 10, imgcount);
-      dim3 block(32, 32, 1);
+      dim3 grid(1, 1, imgcount);
+      dim3 block(24, 24, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 112 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 - 112 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 10 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 - 10 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
