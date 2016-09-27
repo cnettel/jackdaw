@@ -143,8 +143,8 @@ __host__ __device__ likelihood(idealsphere& spherer, float factor) : spherer(sph
 
     float intensity = getIntensity(data);
     // BAGLIVO STYLE!!!
-    if (!spherer.dPhotons[data]) return 0;
-    return spherer.dPhotons[data] * log(intensity / spherer.dPhotons[data]);
+    /*if (!spherer.dPhotons[data]) return 0;
+    return spherer.dPhotons[data] * log(intensity / spherer.dPhotons[data]);*/
 
 
     float val = 0;
@@ -446,7 +446,7 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 	      }*/
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
-	      if ((x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
+	      if ((x > 505 || y > 505) || /*(x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
