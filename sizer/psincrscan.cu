@@ -478,8 +478,8 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 10 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 - 10 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 0 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 - 0 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
