@@ -5,7 +5,7 @@ nonzeroy(~mask) = y(~mask);
 f = @(varargin)diff_func(l,mask,nonzeroy,diffy, minval, varargin{:});
 
 
-function [v,x] = diff_func(l, mask, y, diffy, minval, x, t)
+function [v,x,vals] = diff_func(l, mask, y, diffy, minval, x, t)
 x1 = x(mask);
 x2 = x(mask);
 
@@ -68,4 +68,10 @@ x(mask) = xb(index)';
 x = max(x, -diffy+2*epsval+minval);
 
 vals = -(y(mask) .* (log((x(mask) + diffy(mask)) ./ diffy(mask))) - l(mask).*x(mask));
+if nargout > 2
+    vals2 = x;
+    vals2(:) = 0;
+    vals2(mask) = vals;
+    vals = vals2;
+end
 v = sum(vals);
