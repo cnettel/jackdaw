@@ -25,7 +25,7 @@ copts.maxIts = 1;
 copts.muDecrement = 1;
 copts.innerTol = 1e-11;
 copts.tol = 1e-11;
-copts.betaTol = 1e3;
+copts.betaTol = 1e-6;
 copts.accel = 1;
 copts.innerMaxIts = 10000;
 
@@ -36,7 +36,7 @@ onefilter = ones(side2, side2);
 
 ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,onefilter));
 x = reshape(initguess, side2 * side2, 1);
-betanow = 1;
+betanow = 1e2;
 
 for outerround=1:numrounds
     outerround
