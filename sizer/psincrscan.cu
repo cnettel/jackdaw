@@ -19,7 +19,7 @@ const int NY = 1056;
 
 const int FX = 4096;
 const int FY = 4096;
-const int BS = 4;
+const int BS = 2;
 
 __device__ __host__ float sinc(float val)
 {
@@ -183,14 +183,14 @@ struct intensitygetter : public thrust::unary_function<int, float>
 __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsigned int ty, unsigned int zval, unsigned int bx, unsigned int by, float* lsum, int* psum, long long* phc)
 {
 //  myspherer.r = exp(myspherer.roffset + (zval) * myspherer.rfactor);
-  myspherer.offsetx = ((bx*32 + tx) * 1.f) /** 1.19f*/ + myspherer.baseoffsetx;
+  myspherer.offsetx = (((bx%5)*32 + tx) * 1.f) /** 1.19f*/ + myspherer.baseoffsetx;
   myspherer.offsety = ((by*32 + ty) * 1.f /** 1.19f*/ + myspherer.baseoffsety);
   myspherer.extrax = /*bx*/0;
   myspherer.extray = /*by*/0;
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
   myspherer.dLambdas = &myspherer.dLambdas[zval * NY * NX];
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
-  myspherer.lfactor =  1.00 * pow(1.15f, -0.f /*+ bx*/);
+  myspherer.lfactor =  1.00 * pow(1.06f, -5.f + (bx / 5));
 
   float fittedPhc = phc[zval * 3 + 2];
   float minPhc = max(1e-5, -6 * sqrt(0.6 * fittedPhc) + 0.6 * fittedPhc);
@@ -347,10 +347,10 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
   thrust::device_vector<float> dExpLambdas(NY * NX);
   thrust::device_vector<float> dLogLs(NY * NX);
   boost::multi_array<int, 2> hMask(extents[NY][NX]);
-  thrust::device_vector<float> dIntensity(BS * 10 * 10 * 32 * 32);
-  thrust::host_vector<float> hIntensity(BS * 10 * 10 * 32 * 32);
-  thrust::device_vector<float> dIntensity2(BS * 10 * 10 * 32 * 32);
-  thrust::host_vector<float> hIntensity2(BS * 10 * 10 * 32 * 32);
+  thrust::device_vector<float> dIntensity(BS * 50 * 10 * 32 * 32);
+  thrust::host_vector<float> hIntensity(BS * 50 * 10 * 32 * 32);
+  thrust::device_vector<float> dIntensity2(BS * 50 * 10 * 32 * 32);
+  thrust::host_vector<float> hIntensity2(BS * 50 * 10 * 32 * 32);
   thrust::device_vector<int> dpsum(BS);
   thrust::device_vector<float> dlsum(BS);
   //thrust::host_vector<long long> hPhc(BS * 3);
@@ -446,17 +446,18 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 	      }*/
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
-	      if (/*(x > 505 || y > 505) || */(x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20)
+	      if (/*(x > 505 || y > 505) || */(x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20 
+	      /*|| lambdaVals[j][y][x] > 0.01*/)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
 	      }
 
-	      /*if (photonVals[j][y][x] > 3)
+/*	      if (photonVals[j][y][x] > 2)
 {	      
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
-		}*/	      
+		}	      */
 	      photonVals[j][y][x] *= hMask[y][x];
 	      lambdaVals[j][y][x] *= hMask[y][x];
 
@@ -471,15 +472,15 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(1, 1, imgcount);
-      dim3 block(24, 24, 1);
+      dim3 grid(50, 5, imgcount);
+      dim3 block(32, 32, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 0 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 - 0 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 32 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 - 32 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
@@ -549,9 +550,9 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	  for (int subimg = 0; subimg < imgcount; subimg++)
 	    {
         int maxR = /*maxidx / grid.y / block.y / grid.x / block.x*/ maxr[subimg];
-	int maxX = maxidx[subimg] % (block.x * grid.x);
+	int maxX = maxidx[subimg] % (block.x * 5);
 	int maxY = (maxidx[subimg] / (grid.x * block.x)) % (block.y * grid.y);
-	int maxI = /*(maxidx[subimg] / (block.x * grid.x * block.y)) % grid.y*/0;
+	int maxI = (maxidx[subimg] / (5 * grid.x * block.y)) % (grid.x / 5 * grid.y);
 	int maxI2 = /*(maxidx[subimg] / block.x) % grid.x*/0;
 	printf("%d %d %lf %g %g %g %d %d %d %d %g %d %d %d %d\n", img + subimg, psum[subimg], lsum[subimg], minval[subimg], maxval[subimg], hIntensity[subimg * base], maxR, maxX, maxY, cudaGetLastError(), maxint[subimg], maxI, maxI2, maxdx[subimg], maxdy[subimg]); 
 	    }
