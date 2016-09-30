@@ -1,7 +1,7 @@
 function [f] = diffpoisson(l,y,diffy,minval)
 nonzeroy = max(y,1e-14);
 mask = ~(y<0 | isnan(y));
-nonzeroy(~mask) = y(~mask);
+%minval(~mask) = 0;
 f = @(varargin)diff_func(l,mask,nonzeroy,diffy, minval, varargin{:});
 
 

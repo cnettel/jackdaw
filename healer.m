@@ -36,7 +36,7 @@ onefilter = ones(side2, side2);
 
 ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,onefilter));
 x = reshape(initguess, side2 * side2, 1);
-betanow = 1e2;
+betanow = 1e-2;
 
 for outerround=1:numrounds
     outerround
@@ -44,7 +44,7 @@ for outerround=1:numrounds
     
     patternmask = (pattern < 0 | isnan(pattern));
     truebild = pattern;
-    truebild(patternmask) = x(patternmask);
+    truebild(patternmask) = x(patternmask) + lambdas(patternmask);
     filter = 1./sqrt(max(truebild(:)+1,1e-15)) + 0.00001;
     filter = 1./filter;
     %filter = filter + sqrt(0.1);
