@@ -190,7 +190,7 @@ __device__ likelihood getObjects(idealsphere& myspherer, unsigned int tx, unsign
   myspherer.dPhotons = &myspherer.dPhotons[zval * NY * NX];
   myspherer.dLambdas = &myspherer.dLambdas[zval * NY * NX];
   //myspherer.lfactor = 0.25 / sqrt(lsum) * (((int) bx 0)) + 1.0;
-  myspherer.lfactor =  1.00 * pow(1.06f, -5.f + (bx / 5));
+  myspherer.lfactor =  1.00 * pow(1.06f, -0.f + (bx / 5));
 
   float fittedPhc = phc[zval * 3 + 2];
   float minPhc = max(1e-5, -6 * sqrt(0.6 * fittedPhc) + 0.6 * fittedPhc);
@@ -447,7 +447,7 @@ H5::H5File maskfile(argv[2], H5F_ACC_RDONLY);
 /*	      if (((y > 187) && (y < 220))|| ((x < 205) && (x > 190)) ||
 	      ((y > 234 && x > 147) && (y < 336 && x < 239)))*/
 	      if (/*(x > 505 || y > 505) || */(x > 510 && y < 527) || (y > 527 && (x > 505 && x < 520)) || /* y < 515 || y > 969 || x > 512 ||*/ lambdaVals[j][y][x] < 1e-20 
-	      /*|| lambdaVals[j][y][x] > 0.01*/)
+	      || lambdaVals[j][y][x] > 0.01)
 	      {
 		photonVals[j][y][x] = 0;
 		lambdaVals[j][y][x] = 0;
@@ -472,15 +472,15 @@ fprintf(stderr, "%d %d %lf\n", j + img, dpsum, dlsum);
 	}
       
 //      if (psum - lsum < 2500) continue;
-      dim3 grid(50, 5, imgcount);
+      dim3 grid(5, 5, imgcount);
       dim3 block(32, 32, 1);
 
       int base = (grid.y * block.y * grid.x * block.x * block.z);
 
       float rfactor = 0.0025;
       float roffset = -10;
-      spherer.baseoffsetx = NX / 2 - 32 - 0.5; // good val -10
-      spherer.baseoffsety = NY / 2 - 32 - 0.5; // good val +10
+      spherer.baseoffsetx = NX / 2 - 54 - 0.5; // good val -10
+      spherer.baseoffsety = NY / 2 - 54 - 0.5; // good val +10
       dPhotons.assign(photonVals.data(), photonVals.data() + imgcount * NY * NX);
       dLambdas.assign(lambdaVals.data(), lambdaVals.data() + imgcount * NY * NX);
       //dPhc.assign(hPhc.data(), hPhc.data() + imgcount * 3);
