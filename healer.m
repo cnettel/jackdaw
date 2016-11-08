@@ -12,7 +12,7 @@ opts.tol = 1e-11;
 opts.maxmin = -1;
 opts.debug = 0;
 opts.restart = 200000;
-opts.maxIts = 200000;
+opts.maxIts = 5000;
 opts.countOps = 1;
 %opts.cntr_reset = 0;
 opts.stopCrit = 3;
@@ -63,7 +63,7 @@ for outerround=1:numrounds
     l = -diffxt;
     l(x2 > 0) = -maxdiff;
 
-    [x,out] = tfocs_SCD(smoothop, {linop_adjoint(ourlinp),0*diffxt+1e-300}, {prox_boxDual(l, u, -1)}, betanow, 0, [], opts, copts);
+    [x,out] = tfocs_SCD(smoothop, {linop_adjoint(ourlinp),0*diffxt+1e-300}, {prox_boxDual(l, u, -1)}, betanow, 0, z0, opts, copts);
     z0 = out.dual;
 
     x = x .* filter;

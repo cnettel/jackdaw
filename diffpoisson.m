@@ -8,10 +8,11 @@ f = @(varargin)diff_func(l,mask,nonzeroy,diffy, minval, varargin{:});
 function [v,x,vals] = diff_func(l, mask, y, diffy, minval, x, t)
 x1 = x(mask);
 x2 = x(mask);
+origx = x;
 
 epsval = max(eps(diffy));
 
-if nargin > 4 && t > 0
+if nargin > 6 && t > 0
     t = 1./t;
     % Solving the quadratic system for the derivative of the proximal
     % operator definition being 0.
@@ -36,7 +37,7 @@ if nargin > 4 && t > 0
 %     x1(mask2) = -dy2 + 2 * epsval;
 %     x2(mask2) = 0;
 else
-    'Warning'
+    %'Warning'
 end
 
 xb = [x1' ; x2'];
@@ -65,9 +66,28 @@ x(mask) = xb(index)';
 % Avoid singularities by moving away from zero
 % This step will also ensure that those x values that are not in the mask
 % are still positive.
-x = max(x, -diffy+2*epsval+minval);
+oldx = x;
+global x98; 
+x98 = oldx;
+lim = 0.01;
+xbase = -diffy+2*epsval+minval-lim/2;
+x = max(x, xbase);
 
-vals = -(y(mask) .* (log((x(mask) + diffy(mask)) ./ diffy(mask))) - l(mask).*x(mask));
+upperlim = xbase + lim;
+mask3 = (x > xbase) & (x < upperlim);
+mask4 = mask3 & (origx < xbase);
+x(mask4) = xbase(mask4);
+mask4 = mask3 & (origx > upperlim);
+x(mask4) = upperlim(mask4);
+mask4 = mask3 & (origx > xbase) & (origx < upperlim);
+x(mask4) = origx(mask4);
+
+mask5 = x < upperlim;
+xupperlim = x;
+xupperlim(mask5) = upperlim(mask5);
+
+
+vals = -(y(mask) .* (log((xupperlim(mask) + diffy(mask)) ./ diffy(mask))) - l(mask).*xupperlim(mask));
 if nargout > 2
     vals2 = x;
     vals2(:) = 0;
@@ -75,3 +95,11 @@ if nargout > 2
     vals = vals2;
 end
 v = sum(vals);
+if (nargin == 6 || t == 0) && sum(abs(oldx - x)) > 0
+    v = Inf;
+end
+if nargin == 6 && nargout > 1
+    g = y(mask)./(x(mask) + diffy(mask)) - l(mask) .* (x(mask) + diffy(mask));
+    x(:) = 0;
+    x(mask) = -g;
+end
