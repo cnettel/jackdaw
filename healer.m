@@ -64,6 +64,7 @@ for outerround=1:numrounds
     l(x2 > 0) = -maxdiff;
 
     [x,out] = tfocs_SCD(smoothop, {linop_adjoint(ourlinp),0*diffxt+1e-300}, {prox_boxDual(l, u, -1)}, betanow, 0, z0, opts, copts);
+%    [x,out] = tfocs(smoothop, {linop_adjoint(ourlinp),0*diffxt+1e-300}, p, betanow, 0, z0, opts, copts);
     z0 = out.dual;
 
     x = x .* filter;
