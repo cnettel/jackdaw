@@ -1,13 +1,14 @@
-function [f] = diffpoisson(l,y,basey,minval,absrefpoint,filter)
-% TODO: l support might be stale
+function [f] = diffpoisson(scale,y,basey,minval,absrefpoint,filter,qbarrier)
+% TODO: scale support might be stale
 mask = ~(y<0 | isnan(y));
-f = @(varargin)diff_func(l,mask,basey, minval, absrefpoint, 1 ./ (filter.^2), varargin{:});
+rscale = 1./l;
+f = @(varargin)diff_func(rscale,mask,basey, minval, absrefpoint, 1 ./ (filter.^2), varargin{:});
 
-function [v,x,vals] = diff_func(l, mask, y, basey, minval, absrefpoint, filterrsq, x)
+function [v,x,vals] = diff_func(l, mask, y, basey, minval, absrefpoint, filterrsq, qbarrier, x)
 % Avoid singularities by moving away from zero
 % This step will also ensure that those x values that are not in the mask
 % are still positive.
-lim = 1e-14./ l .* filterrsq;
+lim = qbarrier .* rscale .* filterrsq;
 
 % Special treatment occurs between xbase and upperlim
 % At one point, values below xbase were subjected to hard cap
@@ -43,14 +44,13 @@ end
 % In theory, we might want the limit for the quadratic completion to be different than lim, but not in practice
 lim2 = lim;
 
-limfac = 1./l;
 % Add quadratic for all low-value elements
 subs = x < xbase + lim2;
-vals(subs) = vals(subs) + ((x(subs) - xbase(subs) - lim2(subs)).^2.*1./lim2(subs) .* limfac(subs));
+vals(subs) = vals(subs) + ((x(subs) - xbase(subs) - lim2(subs)).^2.*1./lim2(subs) .* rscale(subs));
 
 % Compensate by quadratic from absrefpoint position, if any
 subs2 = absrefpoint - basey < xbase + lim2;
-vals(subs2) = vals(subs2) - ((absrefpoint(subs2) - basey(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2) .* limfac(subs2));
+vals(subs2) = vals(subs2) - ((absrefpoint(subs2) - basey(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2) .* rscale(subs2));
 
 v = sum(vals);
 
@@ -60,7 +60,7 @@ if nargout > 1
     x(:) = 0;
     x(mask) = -g;
     if any(subs)
-      x(subs) = x(subs) + 2 * (oldx(subs) - xbase(subs) - lim2(subs)).^1 .* (1./lim2(subs).^1) .* limfac(subs);
+      x(subs) = x(subs) + 2 * (oldx(subs) - xbase(subs) - lim2(subs)).^1 .* (1./lim2(subs).^1) .* rscale(subs);
     end
     x = x;
 end
