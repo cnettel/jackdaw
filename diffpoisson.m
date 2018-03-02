@@ -95,7 +95,7 @@ x(mask) = xb(index)';
 % are still positive.
 oldx = x;
 global f2;
-lim = 1e-1./ l ./f2(:);
+lim = 1e-14./ l ./f2(:) ./ f2(:);
 xbase = -diffy+2*epsval+minval - lim ./ 2;
 upperlim = xbase + lim;
 
@@ -161,20 +161,21 @@ if invnow > 0
     x = -x;
 end
 lim2 = lim * 1;%0.5167;
-limfac = 1;
+% Has to be 1
+limfac = 1./l;%./(f2(:).^1);
 subs = x < xbase + lim2;
 
-vals(subs) = vals(subs) + ((x(subs) - xbase(subs) - lim2(subs)).^2.*1./lim2(subs) * limfac);
+vals(subs) = vals(subs) + ((x(subs) - xbase(subs) - lim2(subs)).^2.*1./lim2(subs) .* limfac(subs));
 
 subs2 = diffyz10 - diffy < xbase + lim2;
-vals(subs2) = vals(subs2) - ((diffyz10(subs2) - diffy(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2) * limfac);
+vals(subs2) = vals(subs2) - ((diffyz10(subs2) - diffy(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2) .* limfac(subs2));
 
-v = sum(vals);
+v = sum(vals);%.*(f2(:)));
 
 
 if (nargin == 7 || t == 0) && (sum(abs(oldx - x)) > 0 || any(x < xbase))
     %sum(abs(oldx-x))
-    t;
+    %t;
     %v = Inf;
 end
 
@@ -187,9 +188,10 @@ if nargin == 7% && nargout > 1
     x(mask) = -g;
 %    x(mask & mask8) = 1;
     if any(subs)
-      x(subs) = x(subs) + 2 * (oldx(subs) - xbase(subs) - lim2(subs)).^1 .* (1./lim2(subs).^1) * limfac;
-      min(x(subs))
+      x(subs) = x(subs) + 2 * (oldx(subs) - xbase(subs) - lim2(subs)).^1 .* (1./lim2(subs).^1) .* limfac(subs);
     end
+    x = x;% .*f2 ;
 end
+
 %endx = x(1)
 %endxbase = xbase(1)
