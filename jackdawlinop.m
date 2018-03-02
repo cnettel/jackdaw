@@ -15,8 +15,10 @@ x2(1:hs, end-hs+1:end) = x(1:hs, side1-hs+1:side1);
 x2(end-hs+1:end, end-hs+1:end) = x(side1-hs+1:side1, side1-hs+1:side1);
 
 x = fft2(x2);
-x(:,129) = 0;
-x(129,:) = 0;
+if side2 / 2 == floor(side2 / 2)
+  x(:,side2 / 2 + 1) = 0;
+  x(side2 / 2 + 1,:) = 0;
+end
 y = 1/side2 * real(x(indices));
 %[norm(real(x(indices)))/norm(imag(x(indices)))]
 y = y(:) .* filter(:);
@@ -25,8 +27,10 @@ case 2,
 x2 = zeros(side2,side2);
 x2(indices) = real(x(:));
 x2(:) = x2(:) .* filter(:);
-x2(:,129) = 0;
-x2(129,:) = 0;
+if side2 / 2 == floor(side2 / 2)
+  x2(:,side2 / 2 + 1) = 0;
+  x2(side2 / 2 + 1,:) = 0;
+end
 x2 = ifft2(x2);
 x = x2;
 x2 = zeros(side1, side1);
