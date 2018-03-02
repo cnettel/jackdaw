@@ -19,10 +19,10 @@ opts.printStopCrit = 1;
 opts.continuation = 1;
 opts.printEvery = 1e3; 
 
-x2 = reshape(support, side2*side2,1);
+mask = reshape(support, side2*side2,1);
 % Identical for real and imaginary
 % Or purely real
-x2 = [x2; x2 * 0];
+mask = [mask; mask * 0];
 ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,1));
 
 x = reshape(initguess, side2 * side2, 1);
@@ -36,32 +36,20 @@ for outerround=1:numrounds
     filter = fftshift(filter);
     filter = reshape(filter,side2*side2,1);
     filterorig = filter;
-    global f2;
-    f2 = filterorig;
-    %filter(:) = 1;
     
     rfilterorig = 1./filterorig;
     ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilterorig));
     diffxt = ourlinpflat(diffx .* filterorig(:), 2);
 
-
-    %[x,out] = tfocs(smoothop, {ourlinp}, proj_box(l, u), z0, opts);
-    x22 = x2;% & (diffxt >= 0);
-    u = -diffxt;
-    u(x22 > 0) = maxdiff;
-    l = -diffxt;
-    l(x22 > 0) = -maxdiff;
-    l2 = l;
-    %l = l - 1e-1;
-    %u = u + 1e-1;
+    level = -diffxt;
+    level(mask > 0) = 0;
           
-    l2(isinf(l2)) = 0;
-    addlevel = ourlinp(l2,1);
+    xlevel = ourlinp(level, 1);
 
     factor = 1;
     smoothop = diffpoisson(factor, pattern(:), (diffx(:) + lambdas(:)).* 1 ./ factor, lambdas(:) * 1./factor, diffx ./ factor);
-    [x,out] = tfocs({smoothop}, {ourlinp,addlevel}, smooth_quad_hack2(1e18 .* (x22 <= 0), -diffxt-l2), -l2 * 1, opts);
-    x = ourlinp(x,1) + addlevel;
+    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, smooth_quad_hack2(1e18 .* (mask <= 0), -diffxt-level), -level * 1, opts);
+    x = ourlinp(x,1) + xlevel;
     x = x + diffx(:);
 end
 
