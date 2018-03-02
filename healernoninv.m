@@ -1,14 +1,10 @@
 function [outpattern, details] = healer(pattern, support, lambdas, initguess, maxdiff, relmumasked, z0, alg, betanow)
-    global addlevel
-    global l2
-    global addlevel2
 numrounds = 1;
-indices = 1:numel(pattern)';
 % Everything needs to be square and the same dimension
 side2 = size(pattern,1);
 pattern = reshape(pattern, side2*side2, 1);
 
-opts = tfocs_SCD;
+opts = tfocs;
 opts.alg = alg;
 opts.tol = 1e-300;
 opts.maxmin = 1;
@@ -39,7 +35,7 @@ x2 = [x2;x2 * 0];
 onefilter = ones(side2, side2);
 
 global ourlinpflat
-ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,onefilter));
+ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,onefilter));
 
 x = reshape(initguess, side2 * side2, 1);
 
@@ -76,7 +72,8 @@ for outerround=1:numrounds
     %smoothop = diffpoisson(filter, pattern(:), (diffx(:) + lambdas(:)).* 1 ./ filter, lambdas(:) * 1./filter, (z12 + diffx(:) + lambdas(:)) .* 1./filter);
     global ourlinp;
     %filter2 = 1./filterorig(:);
-    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,indices,1./filterorig));
+    rfilterorig = 1./filterorig;
+    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilterorig));
     diffxt = ourlinpflat(diffx .* filterorig(:), 2);
 
     diffxtorig = diffxt;
