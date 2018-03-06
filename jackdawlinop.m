@@ -3,7 +3,7 @@ function [y] = jackdawlinop(x, mode, side1, side2, filter)
 hs = side1 / 2;
 
 switch mode,
-case 0, y = [numel(x), 2*side1*side1];
+case 0, y = [side2*side2, 2*side1*side1];
 case 1,
 x = reshape(x, [side1 2*side1]);
 x = fftshift(x(1:side1,1:side1) + j*x(1:side1,side1+1:side1*2));

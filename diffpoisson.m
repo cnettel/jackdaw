@@ -1,10 +1,11 @@
 function [f] = diffpoisson(scale,y,basey,minval,absrefpoint,filter,qbarrier)
 % TODO: scale support might be stale
 mask = ~(y<0 | isnan(y));
-rscale = 1./l;
-f = @(varargin)diff_func(rscale,mask,basey, minval, absrefpoint, 1 ./ (filter.^2), varargin{:});
+rscale = 1./scale;
+filterrsq = 1./filter.^2;
+f = @(varargin)diff_func(scale, rscale,mask,y,basey, minval, absrefpoint, filterrsq, qbarrier, varargin{:});
 
-function [v,x,vals] = diff_func(l, mask, y, basey, minval, absrefpoint, filterrsq, qbarrier, x)
+function [v,x,vals] = diff_func(scale, rscale, mask, y, basey, minval, absrefpoint, filterrsq, qbarrier, x)
 % Avoid singularities by moving away from zero
 % This step will also ensure that those x values that are not in the mask
 % are still positive.
@@ -31,7 +32,7 @@ absrefpointupperlim = absrefpointupperlim + basey;
 
 % Compute log-poisson difference compared to absrefpoint, and with the log-lambda part capped at xupperlim, rather than true x (which might be less than xupperlim)
 % Beyond xupperlim, extend linearly with the general 1 gradient, and a linear extrapolation of the y * ln(x) term from xupperlim
-vals(mask) = -(y(mask) .* (log((xupperlim(mask) + basey(mask)) ./ max(absrefpointupperlim(mask),0.5e-9))) - l(mask).*(x(mask)-1*(absrefpoint(mask)-basey(mask)))) + (xupperlim(mask) - x(mask)) .* (y(mask) ./ max(xupperlim(mask)+basey(mask),1e-15)) - (absrefpointupperlim(mask) - absrefpoint(mask)) .* (y(mask) ./ max(absrefpointupperlim(mask),1e-15));
+vals(mask) = -(y(mask) .* (log((xupperlim(mask) + basey(mask)) ./ max(absrefpointupperlim(mask),0.5e-9))) - scale(mask).*(x(mask)-1*(absrefpoint(mask)-basey(mask)))) + (xupperlim(mask) - x(mask)) .* (y(mask) ./ max(xupperlim(mask)+basey(mask),1e-15)) - (absrefpointupperlim(mask) - absrefpoint(mask)) .* (y(mask) ./ max(absrefpointupperlim(mask),1e-15));
 
 % Extra debug output
 if nargout > 2
