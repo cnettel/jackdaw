@@ -1,4 +1,4 @@
-function [outpattern, details] = healer(pattern, support, bkg, initguess, alg, numrounds, qbarrier, nzpenalty, iters, tols)
+function [outpattern, details, factor] = healer(pattern, support, bkg, initguess, alg, numrounds, qbarrier, nzpenalty, iters, tols)
 
 % Handle scalars
 nzpenalty = ones(1, numrounds) .* nzpenalty;
@@ -17,42 +17,124 @@ opts.maxmin = 1;
 opts.restart = 5e5;
 opts.countOps = 1;
 opts.printStopCrit = 1;
-opts.printEvery = 100; 
+opts.printEvery = 100;
+% Use "no regress" restart option
+opts.restart = -100000;
+% Special hack in our version of TFOCS to accept mode where both
+% objective function and gradient are checked when determining no-regress option
+opts.autoRestart = 'fun,gra';
 
 mask = reshape(support, side2*side2,1);
-% Identical for real and imaginary
-% Or purely real
+% Purely real, i.e. zero mask in imaginary space
 mask = [mask; mask * 0];
 ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,1));
 
+filter = hann(side2, 'periodic');
+filter = filter * filter';
+filter = filter + 1e-3;
+filter = fftshift(filter);
+factor = reshape(filter, side2*side2, 1);
+factor = factor .* factor;
+
+if isempty(initguess)
+    initguess = pattern(:) .* factor;
+    initguess(initguess < 0) = 0;
+end
+
 x = reshape(initguess, side2 * side2, 1);
+xprev = x;
+y = x;
+jval = 0;
 
 for outerround=1:numrounds
-    opts.maxIts = iters(outerround);
-    opts.tol = tols(outerround);
-    diffx = x;
-    %opts.Lexact = 2 / qbarrier(outerround);
-    opts.Lexact = max(pattern) / qbarrier(outerround).^2;
+    % Acceleration scheme based on assumption of linear steps in response to decreasing qbarrier
+    if outerround > 1 && (qbarrier(outerround) ~= qbarrier(outerround - 1))
+        if (jval > 0)
+            y = x + (x - xprev) .* (qbarrier(outerround) / qbarrier(outerround - 1));
+        end
+        step = norm(y - x)
+        xprev = x;
+        jval = jval + 1;
+    end
     
-    filter = hann(side2, 'periodic');
-    filter = filter * filter';
-    filter = filter + 1e-6;
-    filter = fftshift(filter);
-    filter = reshape(filter,side2*side2,1);
-    rfilter = 1./filter;
+    xprevinner = y;
+    jvalinner = -1;
+    opts.maxIts = ceil(iters(outerround) / 1.1);
+    while true
+      % Static .9 inner acceleration scheme for repeated iterations at the same qbarrier level
+      if jvalinner > 0
+        x = y + (y - xprevinner) * 0.9;
+      else
+        x = y;
+	end
+	size(y)
+	jvalinner = jvalinner + 1;
+	xprevinner = y;
+	opts.maxIts = ceil(opts.maxIts * 1.1);
+    opts.tol = tols(outerround);
+    opts.L0 = 1 ./ qbarrier(outerround);
+    diffx = x;
+    
+    % No actual filter windowing used, window integrated in the scale in diffpoisson instead
+    filter(:) = 1;
+    filter = reshape(filter,side2*side2,1);    
+    rfilter = 1./filter;       
 
-    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilter));
+    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilter))
     diffxt = ourlinpflat(diffx .* filter(:), 2);
 
+    % Perform Hann windowing on our penalty mattix
+    penalty = (reshape((mask(1:side2*side2) <= 0) + j * (mask(side2*side2 + 1:2*side2*side2) <= 0),side2,side2));
+    penalty = fftshift(fft2(fft2(fftshift(penalty)) .* reshape(f2,side2,side2))) / side2 / side2;
+    penalty = [real(penalty) imag(penalty)];
+
+    % Filter out numerical inaccuracies
+    penalty(penalty < 1e-8) = 0;
+
+    penalty = reshape(penalty, side2 * side2 * 2, 1);
+    penalty = penalty * nzpenalty(outerround);
+
+    % Translate those portions that are not penalized
     level = -diffxt;
-    level(mask > 0) = 0;
+    level(penalty == 0) = 0;
           
     xlevel = ourlinp(level, 1);
-    factor = ones(side2*side2,1);
-    smoothop = diffpoisson(factor, pattern(:), (diffx(:) + bkg(:)).* 1 ./ factor, bkg(:) * 1./factor, diffx ./ factor, filter, qbarrier(outerround));
-    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, smooth_quad_hack2(nzpenalty(outerround) .* (mask <= 0), -diffxt-level), -level * 1, opts);
+    % TODO: Should bkg(:) be included in diffx???
+    smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+
+    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, smooth_quad_hack2(penalty, -diffxt-level), -level * 1, opts);
+    norm(level)
+    
     x = ourlinp(x,1) + xlevel;
-    x = x + diffx(:);
+    xupdate = x;
+    levelydiff = norm(xprevinner - y)
+    y = x(:) + diffx(:);
+    levelxdiff = norm(xprevinner - y)
+    
+    % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
+    % If so, the acceleration step was too large, change to previous starting point and redo.
+    % Otherwise, divergence is a real risk.
+    if levelydiff > levelxdiff
+        % Reset acceleration
+        y = xprevinner;
+        continue
+    end
+    
+    x = x(:) + diffx(:);
+
+    % Our step was very small for desired accuracy level, break
+    if abs(smoothop(xupdate))/opts.maxIts < 1e-6 / qbarrier(outerround)
+        break
+    end
+
+    % Our change in function value was so small that the numerical accuracy can be in jeopardy
+    % Within iteration, we are using translation to increase accuracy
+    % Increase number of steps in order to possibly achieve a large enough cnhange
+    if norm(xupdate) / norm(x) < max(1e-4 * qbarrier(outerround), sqrt(eps(1) * side2 * side2))
+        opts.maxIts = opts.maxIts * 2;
+        continue
+    end
+    end
 end
 
 outpattern = reshape(x,side2,side2);
