@@ -1,5 +1,8 @@
 function [y] = jackdawlinop(x, mode, side1, side2, filter)
 
+% FFT2 for TFOCS with possible additional window and differently sized matrices
+% Compelx data expressed as stacked real data
+
 hs = side1 / 2;
 
 switch mode,
@@ -15,20 +18,12 @@ x2(1:hs, end-hs+1:end) = x(1:hs, side1-hs+1:side1);
 x2(end-hs+1:end, end-hs+1:end) = x(side1-hs+1:side1, side1-hs+1:side1);
 
 x = fft2(x2);
-if side2 / 2 == floor(side2 / 2)
-  x(:,side2 / 2 + 1) = 0;
-  x(side2 / 2 + 1,:) = 0;
-end
 y = 1/side2 * real(x(:));
 y = y(:) .* filter(:);
 
 case 2,
 x2 = zeros(side2,side2);
 x2(:) = real(x(:)) .* filter(:);
-if side2 / 2 == floor(side2 / 2)
-  x2(:,side2 / 2 + 1) = 0;
-  x2(side2 / 2 + 1,:) = 0;
-end
 x2 = ifft2(x2);
 x = x2;
 x2 = zeros(side1, side1);
