@@ -3,22 +3,25 @@ import numpy as np
 import scipy.ndimage as ndimage
 import matplotlib
 import spimage
+import argparse
 
-with h5py.File('../../invicosa72orig.mat', 'r') as f:
+parser = argparse.ArgumentParser(prog='domosaic.py', description='Create a mosaic of all results and compute R factors.')
+parser.add_argument('-c', '--coacsfile',  metavar='COACSFILE', type=str, default='invicosa72orig.mat', help='COACS results file')
+parser.add_argument('-a', '--coacsphase',  metavar='COACSPHASE', type=str, default='vs72/phasing.h5', help='Phasing results for coacsed patterns')
+parser.add_argument('-b', '--origphase', metavar='ORIGPHASE', type=str, default='rs72f2/phasing.h5', help='Phasing result for non-coacsed patterns')
+args = parser.parse_args()
+
+
+with h5py.File(args.coacsfile, 'r') as f:
     intensities = f['r3b'][:]
     f2 = np.reshape(f['f2'][:],(256,256))
     strucfactors = np.sqrt(np.fft.fftshift(intensities * f2))
     vs = np.sqrt(np.clip(f['vs'], 0, 1000))
 
-filename = 'vs72b/phasing.h5'
-# Open file
-f1 = h5py.File(filename, 'r+')
-
+f1 = h5py.File(args.coacsphase, 'r+')
 images1 = f1['super_images']
 
-filename = 'rs72f2/phasing.h5'
-f2 = h5py.File(filename, 'r+')
-
+f2 = h5py.File(args.origphase, 'r+')
 images2 = f2['super_images']
 
 M = 50
@@ -52,8 +55,11 @@ for m in range(M):
         
         r_sumvs = r_vsradial
 
+# Which one are we calculating R factors for? Should match whether images1
+# or images2 is used for calculating patterns
 rf = f1
 
+# Remove existing results before adding new ones
 try:
     del f1['mosaic']
 except:
