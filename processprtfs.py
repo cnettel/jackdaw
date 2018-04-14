@@ -3,10 +3,16 @@ import numpy as np
 import scipy.ndimage as ndimage
 import matplotlib
 import spimage
+import argparse
 
-filename = 'vs72b/phasing.h5'
-# Open file
-f = h5py.File(filename, 'r+')
+parser = argparse.ArgumentParser(prog='processprtfs.py', description='Compute superimposed image and phase-retrieval transfer functions.')
+parser.add_argument('-c', '--coacsfile',  metavar='COACSFILE', type=str, default='invicosa72orig.mat', help='COACS results file, used for exact singularity-compensated Hann window f2')
+parser.add_argument('-a', '--phase',  metavar='PHASE', type=str, default='vs72/phasing.h5', help='Phasing results for patterns')
+parser.add_argument('-r', '--ref',  metavar='REF', type=str, default='reference.mat', help='File containing reference pattern')
+args = parser.parse_args()
+
+
+f = h5py.File(args.phase, 'r+')
 
 recons  = f['real_space_final'][:]
 fourier = f['fourier_space_final'][:]
@@ -14,11 +20,11 @@ support = f['support_final'][:]
 rerror  = f['real_error'][:]
 ferror  = f['fourier_error'][:]
 
-with h5py.File('../../invicosa72orig.mat', 'r') as forig:
+with h5py.File(args.coacsfile, 'r') as forig:
     f2 = np.reshape(forig['f2'][:],(256,256))
 
 
-with h5py.File('../../reference.mat', 'r') as reff:
+with h5py.File(args.ref, 'r') as reff:
     reference = reff['reference'][:]
     reference = np.fft.ifftshift(np.fft.fft2(np.fft.fft2(np.fft.fftshift(reference['real'] + 1j * reference['imag'])) * np.sqrt(f2)))
 
