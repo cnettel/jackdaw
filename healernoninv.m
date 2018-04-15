@@ -1,5 +1,20 @@
 function [outpattern, details, factor] = healer(pattern, support, bkg, initguess, alg, numrounds, qbarrier, nzpenalty, iters, tols)
 
+% Main COACS function.
+
+% pattern, the pattern to phase
+% support, the support mask (in autocorrelation space)
+% bkg, background signal, support for non-zero values here basically stale at this point
+% initguess, start guess for the pattern
+% alg, the TFOCS algorithm to use
+% numrounds, the number of outermost iterations
+% qbarrier, the qbarrier (2 * l) in each round
+% nzpenalty, the penalty constant outside of the support
+% iters, number of TFOCS iterations within the round
+% tols, the tolerance used to determine end of iteration in TFOCS
+
+% Acceleration and continuation adapted to COACS is also used, but hardcoded.
+
 % Handle scalars
 nzpenalty = ones(1, numrounds) .* nzpenalty;
 qbarrier = ones(1, numrounds) .* qbarrier;
@@ -22,6 +37,7 @@ opts.printEvery = 100;
 opts.restart = -100000;
 % Special hack in our version of TFOCS to accept mode where both
 % objective function and gradient are checked when determining no-regress option
+% Change to only 'fun' if your version does not support this.
 opts.autoRestart = 'fun,gra';
 
 mask = reshape(support, side2*side2,1);
