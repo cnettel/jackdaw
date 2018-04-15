@@ -19,3 +19,11 @@ python domosaic.py --coacsfile invicosa72orig.mat --coacsphase vs72/phasing.h5 -
 python domosaic.py --coacsfile invicosa72orig.mat --coacsphase vs72/phasing.h5 --origphase rs72f2/phasing.h5 --dor b
 
 # Create more manageable files
+matlab -nojvm -nodesktop -nosplash -r "createsupers"
+
+python strip.py vs72/phasing.h5
+h5repack -f GZIP=9 vs72/phasing.h5 vs72short.h5
+rm vs72/phasing.h5
+
+python strip.py rs72f2/phasing.h5
+h5repack -f GZIP=9 rs72f2/phasing.h5 rs72f2short.h5
