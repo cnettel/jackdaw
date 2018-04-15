@@ -5,7 +5,6 @@ to take a set of COACS patterns.
 
 Author:       Benedikt J. Daurer (benedikt@xray.bmc.uu.se)
               Carl Nettelblad (carl.nettelblad@it.uu.se)
-Last change:  February 9, 2018
 """
 
 # Import other modules
@@ -30,8 +29,7 @@ with h5py.File(args.filename, 'r') as f:
 # Create out support
 support_mask = mask[0:256,0:256].copy()
 support_mask[:] = 0
-#support_mask[113:144,113:144] = 1
-support_mask[83:174,83:174] = 1
+support_mask[113:144,113:144] = 1
 support_mask = np.fft.fftshift(support_mask)
 
 # Phasing parameters
