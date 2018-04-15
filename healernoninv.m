@@ -118,8 +118,7 @@ for outerround=1:numrounds
     % TODO: Should bkg(:) be included in diffx???
     smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
 
-    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, smooth_quad_hack2(penalty, -diffxt-level), -level * 1, opts);
-    norm(level)
+    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, zero_tolerant_quad(penalty, -diffxt-level), -level * 1, opts);
     
     x = ourlinp(x,1) + xlevel;
     xupdate = x;
