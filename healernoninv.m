@@ -101,7 +101,7 @@ for outerround=1:numrounds
 
     % Perform Hann windowing on our penalty mattix
     penalty = (reshape((mask(1:side2*side2) <= 0) + j * (mask(side2*side2 + 1:2*side2*side2) <= 0),side2,side2));
-    penalty = fftshift(fft2(fft2(fftshift(penalty)) .* reshape(f2,side2,side2))) / side2 / side2;
+    penalty = fftshift(fft2(fft2(fftshift(penalty)) .* reshape(factor,side2,side2))) / side2 / side2;
     penalty = [real(penalty) imag(penalty)];
 
     % Filter out numerical inaccuracies
