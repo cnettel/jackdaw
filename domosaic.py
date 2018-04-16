@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser(prog='domosaic.py', description='Create a mosai
 parser.add_argument('-c', '--coacsfile',  metavar='COACSFILE', type=str, default='invicosa72orig.mat', help='COACS results file')
 parser.add_argument('-a', '--coacsphase',  metavar='COACSPHASE', type=str, default='vs72/phasing.h5', help='Phasing results for coacsed patterns')
 parser.add_argument('-b', '--origphase', metavar='ORIGPHASE', type=str, default='rs72f2/phasing.h5', help='Phasing result for non-coacsed patterns')
+parser.add_argument('-r', '--dor', metavar='RMODE', type=str, default='a', help='Compute R factors for coacs (a) or orig (b)')
 args = parser.parse_args()
 
 
@@ -31,12 +32,19 @@ mosaic = np.ones((319,314), dtype=np.complex128) * 0.035
 Rs = np.zeros((M))
 Rsvs = np.zeros((M))
 
+if args.rmode == 'a':
+    rf = f1
+    rimages = images1
+else:
+    rf = f2
+    rimages = images2
+
 for m in range(M):
     x = m % 5
     y = m / 5
     mosaic[y*32:(y+1)*32-1,x*63:x*63+31] = images1[m,128-15:128+16,128-15:128+16]
     mosaic[y*32:(y+1)*32-1,x*63+31:x*63+62] = images2[m,128-15:128+16,128-15:128+16]
-    pattern = np.fft.ifftshift(abs(np.fft.fft2(images1[m])))
+    pattern = np.fft.ifftshift(abs(np.fft.fft2(rimages[m])))
     vspattern = np.fft.fftshift(vs[m * 256:(m + 1) * 256, 0:256])
     centers, nom_radial = spimage.radialMeanImage(abs(pattern-strucfactors), output_r=True)
     centers, nom_radial_vs = spimage.radialMeanImage(abs(vspattern-strucfactors), output_r=True)
@@ -56,10 +64,6 @@ for m in range(M):
         r_max = r_radial
         
         r_sumvs = r_vsradial
-
-# Which one are we calculating R factors for? Should match whether images1
-# or images2 is used for calculating patterns
-rf = f1
 
 # Remove existing results before adding new ones
 try:
