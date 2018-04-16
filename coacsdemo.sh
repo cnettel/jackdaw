@@ -27,3 +27,4 @@ rm vs72/phasing.h5
 
 python strip.py rs72f2/phasing.h5
 h5repack -f GZIP=9 rs72f2/phasing.h5 rs72f2short.h5
+rm rs72f2/phasing.h5
