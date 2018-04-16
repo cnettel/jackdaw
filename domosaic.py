@@ -7,6 +7,13 @@ import matplotlib
 import spimage
 import argparse
 
+
+def deldataset(file, dataset):
+    try:
+        del file[dataset]
+    except:
+        pass
+
 parser = argparse.ArgumentParser(prog='domosaic.py', description='Create a mosaic of all results and compute R factors.')
 parser.add_argument('-c', '--coacsfile',  metavar='COACSFILE', type=str, default='invicosa72orig.mat', help='COACS results file')
 parser.add_argument('-a', '--coacsphase',  metavar='COACSPHASE', type=str, default='vs72/phasing.h5', help='Phasing results for coacsed patterns')
@@ -66,45 +73,17 @@ for m in range(M):
         r_sumvs = r_vsradial
 
 # Remove existing results before adding new ones
-try:
-    del f1['mosaic']
-except:
-    pass
+deldataset(f1, 'mosaic')
+deldataset(f1, 'Rvs')
+deldataset(f1, 'r_sumvs')
 
-try:
-    del rf['r_sum']
-except:
-    pass
+deldataset(rf, 'r_sum')
+deldataset(rf, 'r_min')
+deldataset(rf, 'r_min')
+deldataset(rf, 'r_max')
+deldataset(rf, 'centers')
+deldataset(rf, 'R')
 
-try:
-    del f1['r_sumvs']
-except:
-    pass
-
-try:
-    del rf['r_min']
-except:
-    pass
-
-try:
-    del rf['r_max']
-except:
-    pass
-
-try:
-    del rf['centers']
-except:
-    pass
-
-try:
-    del rf['R']
-except:
-    pass
-
-try:
-    del f1['Rvs']
-except:
-    pass
 
 f1['mosaic'] = mosaic
 rf['r_sum'] = r_sum
