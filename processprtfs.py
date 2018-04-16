@@ -22,7 +22,7 @@ rerror  = f['real_error'][:]
 ferror  = f['fourier_error'][:]
 
 with h5py.File(args.ref, 'r') as reff:
-    f2 = np.reshape(forig['f2'][:],(256,256))
+    f2 = np.reshape(reff['f2'][:],(256,256))
     reference = reff['reference'][:]
     reference = np.fft.ifftshift(np.fft.fft2(np.fft.fft2(np.fft.fftshift(reference['real'] + 1j * reference['imag'])) * np.sqrt(f2)))
 
