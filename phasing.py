@@ -18,13 +18,21 @@ parser = argparse.ArgumentParser(prog='phasing.py', description='A script for ph
 parser.add_argument('-o', '--output',  metavar='PATH', type=str, default='./', help='Output path')
 parser.add_argument('-v', '--variable',  metavar='VARIABLE', type=str, default='rs', help='Variable name')
 parser.add_argument('-f', '--filename', metavar='FILENAME', type=str, default='../../invicosa72orig.mat', help='Input file')
+parser.add_argument('--f2', help='Multiply intensities by squared Hann window', action='store_true')
+parser.add_argument('--mask', help='Mask out negative intensities (otherwise clipped to 0)', action='store_true')
+
 args = parser.parse_args()
 
 # Load the pattern and the specific Hann window used
 with h5py.File(args.filename, 'r') as f:
     intensities = f[args.variable][:]
     f2 = f['f2'][:]
-    mask = (intensities >= -1000).astype(np.bool)
+
+if not args.f2:
+    f2[:] = 1
+
+mask = (intensities >= (0 if args.mask else -1000)).astype(np.bool)
+intensities = np.clip(intensities, 0, 1000)
 
 # Create out support
 support_mask = mask[0:256,0:256].copy()
@@ -55,7 +63,7 @@ M = 100
 
 os.system('rm %s' %(args.output + '/phasing.h5'))
 for n in range(N):
-    R.set_intensities(np.fft.fftshift(intensities[(n*256):((n+1)*256),:])) # * np.reshape(f2,(256,256))))
+    R.set_intensities(np.fft.fftshift(intensities[(n*256):((n+1)*256),:]  * np.reshape(f2,(256,256))))
     R.set_mask(np.fft.fftshift(mask[(n*256):((n+1)*256),:]))
     output = R.reconstruct_loop(M)
     print "Done Reconstructions: %d/%d" %((n+1)*M, N*M)
