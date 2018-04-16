@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(prog='domosaic.py', description='Create a mosai
 parser.add_argument('-c', '--coacsfile',  metavar='COACSFILE', type=str, default='invicosa72orig.mat', help='COACS results file')
 parser.add_argument('-a', '--coacsphase',  metavar='COACSPHASE', type=str, default='vs72/phasing.h5', help='Phasing results for coacsed patterns')
 parser.add_argument('-b', '--origphase', metavar='ORIGPHASE', type=str, default='rs72f2/phasing.h5', help='Phasing result for non-coacsed patterns')
-parser.add_argument('-r', '--dor', metavar='RMODE', type=str, default='a', help='Compute R factors for coacs (a) or orig (b)')
+parser.add_argument('-r', '--dor', metavar='DOR', type=str, default='a', help='Compute R factors for coacs (a) or orig (b)')
 args = parser.parse_args()
 
 
@@ -32,7 +32,7 @@ mosaic = np.ones((319,314), dtype=np.complex128) * 0.035
 Rs = np.zeros((M))
 Rsvs = np.zeros((M))
 
-if args.rmode == 'a':
+if args.dor == 'a':
     rf = f1
     rimages = images1
 else:
