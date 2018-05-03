@@ -75,18 +75,17 @@ for outerround=1:numrounds
     
     xprevinner = y;
     jvalinner = -1;
-    opts.maxIts = ceil(iters(outerround) / 1.1);
+    opts.maxIts = ceil(iters(outerround) / 1.01);
     while true
       % Static .9 inner acceleration scheme for repeated iterations at the same qbarrier level
       if jvalinner > 0
         x = y + (y - xprevinner) * 0.9;
       else
         x = y;
-	end
-	size(y)
+      end
+    xprevinner = y;
 	jvalinner = jvalinner + 1;
-	xprevinner = y;
-	opts.maxIts = ceil(opts.maxIts * 1.1);
+	opts.maxIts = ceil(opts.maxIts * 1.01);
     opts.tol = tols(outerround);
     opts.L0 = 1 ./ qbarrier(outerround);
     diffx = x;
@@ -96,7 +95,7 @@ for outerround=1:numrounds
     filter = reshape(filter,side2*side2,1);    
     rfilter = 1./filter;       
 
-    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilter))
+    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilter));
     diffxt = ourlinpflat(diffx .* filter(:), 2);
 
     % Perform Hann windowing on our penalty mattix
@@ -122,14 +121,15 @@ for outerround=1:numrounds
     
     x = ourlinp(x,1) + xlevel;
     xupdate = x;
-    levelydiff = norm(xprevinner - y)
+    oldy = y;
+    levelprevdiff = norm(xprevinner - diffx)
     y = x(:) + diffx(:);
     levelxdiff = norm(xprevinner - y)
     
     % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
     % If so, the acceleration step was too large, change to previous starting point and redo.
     % Otherwise, divergence is a real risk.
-    if levelydiff > levelxdiff
+    if levelprevdiff > levelxdiff
         % Reset acceleration
         y = xprevinner;
         continue
@@ -137,15 +137,20 @@ for outerround=1:numrounds
     
     x = x(:) + diffx(:);
 
+    global x2;
+    x2 = x;
+    save x2 x2
+
     % Our step was very small for desired accuracy level, break
-    if abs(smoothop(xupdate))/opts.maxIts < 1e-6 / qbarrier(outerround)
+    if abs(smoothop(xupdate)+smoothop(xprevinner(:) - diffx(:)))/opts.maxIts < 1e-6 / qbarrier(outerround)
+      'Next outer iteration'
         break
     end
 
     % Our change in function value was so small that the numerical accuracy can be in jeopardy
     % Within iteration, we are using translation to increase accuracy
     % Increase number of steps in order to possibly achieve a large enough cnhange
-    if norm(xupdate) / norm(x) < max(1e-4 * qbarrier(outerround), sqrt(eps(1) * side2 * side2))
+    if norm(xupdate) / norm(x) < max(1e-4, sqrt(eps(1) * side2 * side2))
         opts.maxIts = opts.maxIts * 2;
         continue
     end

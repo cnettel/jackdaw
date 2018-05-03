@@ -18,6 +18,7 @@ x = x .* rscale;
 % Rescale limit by scaling to get a low gradient Lipschitz constant everywhere
 lim = qbarrier .* filterrsq .* (rscale .* rscale);
 
+
 % Special treatment occurs between xbase and upperlim
 xbase = -basey + minval - lim ./ 2;
 upperlim = xbase + lim;
@@ -43,8 +44,8 @@ if nargout > 2
     vals = vals2;
 end
 
-% In theory, we might want the limit for the quadratic completion to be different than lim, but not in practice
 lim2 = lim;
+lim2(~mask) = lim2(~mask) * 0.5;
 
 % Add quadratic for all low-value elements
 subs = x < xbase + lim2;
