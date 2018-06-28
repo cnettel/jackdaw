@@ -21,7 +21,8 @@ qbarrier = ones(1, numrounds) .* qbarrier;
 
 % Everything needs to be square and the same dimension
 side2 = size(pattern,1);
-pattern = reshape(pattern, side2*side2, 1);
+fullsize = numel(pattern);
+pattern = reshape(pattern, fullsize, 1);
 
 opts = tfocs;
 opts.alg = alg;
@@ -40,16 +41,34 @@ opts.restart = -100000;
 % Change to only 'fun' if your version does not support this.
 opts.autoRestart = 'fun,gra';
 
-mask = reshape(support, side2*side2,1);
+mask = reshape(support, fullsize,1);
 % Purely real, i.e. zero mask in imaginary space
 mask = [mask; mask * 0];
-ourlinpflat = @(x, mode) (jackdawlinop(x,mode,side2,side2,1));
+ourlinpflat = jackdawlinop(side2,1);
 
+global filter
 filter = hann(side2, 'periodic');
-filter = filter * filter';
-filter = filter + 1e-3;
+%filter = filter * filter';
 filter = fftshift(filter);
-factor = reshape(filter, side2*side2, 1);
+
+side3 = side2
+
+filter1 = repmat(filter, [1 side2 side2]);
+filter2 = ones(1,side2,1);
+filter2(:) = filter(:);
+filter2 = repmat(filter2, [side2 1 side2]);
+
+filter3 = ones(1,1,side2);
+filter3(:) = filter(:);
+filter3 = repmat(filter3, [side2 side2 1]);
+
+
+
+filter = filter1 .* filter2 .* filter3;
+filter = filter + 1e-3;
+
+global factor
+factor = reshape(filter, fullsize, 1);
 factor = factor .* factor;
 
 if isempty(initguess)
@@ -57,7 +76,7 @@ if isempty(initguess)
     initguess(initguess < 0) = 0;
 end
 
-x = reshape(initguess, side2 * side2, 1);
+x = reshape(initguess, fullsize, 1);
 xprev = x;
 y = x;
 jval = 0;
@@ -66,7 +85,11 @@ for outerround=1:numrounds
     % Acceleration scheme based on assumption of linear steps in response to decreasing qbarrier
     if outerround > 1 && (qbarrier(outerround) ~= qbarrier(outerround - 1))
         if (jval > 0)
-            y = x + (x - xprev) .* (qbarrier(outerround) / qbarrier(outerround - 1));
+            diffx = x + (x - xprev) .* (qbarrier(outerround) / qbarrier(outerround - 1));
+            diffxt = ourlinpflat(diffx .* filter(:), 2); 
+            smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+            proxop = zero_tolerant_quad(penalty, -diffxt-level);
+            y = x + halfboundedlinesearch((x - xprev), @(z) (smoothop(z + (x-diffx)) + proxop(ourlinp(z + (x-diffx), 2))));
         end
         step = norm(y - x)
         xprev = x;
@@ -78,8 +101,9 @@ for outerround=1:numrounds
     opts.maxIts = ceil(iters(outerround) / 1.01);
     while true
       % Static .9 inner acceleration scheme for repeated iterations at the same qbarrier level
-      if jvalinner > 0
-        x = y + (y - xprevinner) * 0.9;
+      if jvalinner >= 0
+        %x = y + (y - xprevinner) * 0.9;
+        x = y + halfboundedlinesearch((y - xprevinner), @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-diffx), 2))));
       else
         x = y;
       end
@@ -92,38 +116,46 @@ for outerround=1:numrounds
     
     % No actual filter windowing used, window integrated in the scale in diffpoisson instead
     filter(:) = 1;
-    filter = reshape(filter,side2*side2,1);    
+    filter = reshape(filter,fullsize,1);    
     rfilter = 1./filter;       
 
-    ourlinp = @(x, mode) (jackdawlinop(x,mode,side2,side2,rfilter));
+    global ourlinp
+    ourlinp = jackdawlinop(side2,rfilter);
+  
     diffxt = ourlinpflat(diffx .* filter(:), 2);
 
-    % Perform Hann windowing on our penalty mattix
-    penalty = (reshape((mask(1:side2*side2) <= 0) + j * (mask(side2*side2 + 1:2*side2*side2) <= 0),side2,side2));
-    penalty = fftshift(fft2(fft2(fftshift(penalty)) .* reshape(factor,side2,side2))) / side2 / side2;
+    % Perform Hann windowing on our penalty matrix
+    global penalty;
+    penalty = (reshape((mask(1:fullsize) <= 0) + j * (mask(fullsize + 1:2*fullsize) <= 0),side2,side2,side2));
+    penalty = fftshift(fftn(fftn(fftshift(penalty)) .* reshape(factor,side2,side2,side2))) / fullsize;
     penalty = [real(penalty) imag(penalty)];
 
     % Filter out numerical inaccuracies
     penalty(penalty < 1e-8) = 0;
 
-    penalty = reshape(penalty, side2 * side2 * 2, 1);
+    penalty = reshape(penalty, 2 * fullsize, 1);
     penalty = penalty * nzpenalty(outerround);
 
     % Translate those portions that are not penalized
-    level = -diffxt;
+    level = -diffxt * 0;
     level(penalty == 0) = 0;
           
     xlevel = ourlinp(level, 1);
     % TODO: Should bkg(:) be included in diffx???
     smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+    proxop = zero_tolerant_quad(penalty, -diffxt-level);
 
-    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, zero_tolerant_quad(penalty, -diffxt-level), -level * 1, opts);
+    [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, proxop, -level * 1, opts);
     
+    xtupdate = x;
     x = ourlinp(x,1) + xlevel;
     xupdate = x;
     oldy = y;
-    levelprevdiff = norm(xprevinner - diffx)
+    prevstep = xprevinner - diffx;
+    levelprevdiff = norm(prevstep)
     y = x(:) + diffx(:);
+    y = y + halfboundedlinesearch(x, @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-diffx), 2))));
+    y = y + halfboundedlinesearch(prevstep, @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-diffx), 2))));
     levelxdiff = norm(xprevinner - y)
     
     % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
@@ -131,18 +163,19 @@ for outerround=1:numrounds
     % Otherwise, divergence is a real risk.
     if levelprevdiff > levelxdiff
         % Reset acceleration
-        y = xprevinner;
-        continue
+        %y = xprevinner;
+        'Do we need to reset acceleration?'
+        %continue
     end
     
-    x = x(:) + diffx(:);
+    x = y;
 
     global x2;
     x2 = x;
-    save x2 x2
+    save x3 x2
 
     % Our step was very small for desired accuracy level, break
-    if abs(smoothop(xupdate)+smoothop(xprevinner(:) - diffx(:)))/opts.maxIts < 1e-6 / qbarrier(outerround)
+    if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - diffx, 2) - level(:)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:))) /opts.maxIts < 1e-7
       'Next outer iteration'
         break
     end
@@ -150,7 +183,8 @@ for outerround=1:numrounds
     % Our change in function value was so small that the numerical accuracy can be in jeopardy
     % Within iteration, we are using translation to increase accuracy
     % Increase number of steps in order to possibly achieve a large enough cnhange
-    if norm(xupdate) / norm(x) < max(1e-4, sqrt(eps(1) * side2 * side2))
+    %if norm(xupdate) / norm(x) < max(1e-4, sqrt(eps(1) * side2 * side2))
+    if levelxdiff < max(1e-7 * norm(x), sqrt(eps(1) * fullsize))
         opts.maxIts = opts.maxIts * 2;
         continue
     end

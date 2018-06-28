@@ -5,14 +5,14 @@ filterrsq = 1./filter.^2;
 baseyscaled = basey .* rscale;
 absrefpointscaled = absrefpoint .* rscale;
 
-% Assuming square shape
-side2 = sqrt(length(y(:)));
-
 f = @(varargin)diff_func(scale, rscale,mask,y,baseyscaled, minval, absrefpointscaled, filterrsq, qbarrier, varargin{:});
 
 
 
 function [v,x,vals] = diff_func(scale, rscale, mask, y, basey, minval, absrefpoint, filterrsq, qbarrier, x)
+
+global x2
+x2 = x;
 
 x = x .* rscale;
 % Rescale limit by scaling to get a low gradient Lipschitz constant everywhere
