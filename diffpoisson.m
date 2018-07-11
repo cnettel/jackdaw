@@ -30,7 +30,7 @@ xupperlim(subupper) = upperlim(subupper);
 vals = 0 * x;
 refpoint = absrefpoint(:) - basey(:);
 refpointupperlim = refpoint;
-refpointupperlim(refpoint<upperlim) = upperlim(refpoint<upperlim);
+refpointupperlim(refpoint(:)<upperlim(:)) = upperlim(refpoint(:)<upperlim(:));
 absrefpointupperlim = refpointupperlim(:) + basey(:);
 
 % Compute log-poisson difference compared to absrefpoint, and with the log-lambda part capped at xupperlim, rather than true x (which might be less than xupperlim)
@@ -52,19 +52,19 @@ lim2 = lim;
 lim2(~mask) = lim2(~mask) * 0.5;
 
 % Add quadratic for all low-value elements
-subs = x < xbase + lim2;
+subs = x(:) < xbase(:) + lim2(:);
 limfac = ones(size(mask));
 %limfac(mask) = limfac(mask) + (y(mask)./max(upperlim(mask) + basey(mask),1e-15));
 vals(subs) = vals(subs) + (x(subs).^2).*1./lim2(subs) .* limfac(subs);
 
 % Compensate by quadratic from absrefpoint position, if any
-subs2 = refpoint < xbase + lim2;
+subs2 = refpoint(:) < xbase(:) + lim2(:);
 %vals(subs2) = vals(subs2) - ((absrefpoint(subs2) - basey(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2)) .* limfac(subs2);
 vals(subs2) = vals(subs2) - (refpoint(subs2)).^2 .* 1./lim2(subs2) .* limfac(subs2);
 
 subs3 = subs - subs2;
 
-vals = vals + (subs3 .* (xbase + lim2).^2 + (-subs .* x + subs2 .* (absrefpoint - basey)) .* 2 .* (xbase + lim2) ).*1./lim2 .* limfac;
+vals(:) = vals(:) + (subs3(:) .* (xbase(:) + lim2(:)).^2 + (-subs(:) .* x(:) + subs2(:) .* (absrefpoint(:) - basey(:))) .* 2 .* (xbase(:) + lim2(:)) ).*1./lim2(:) .* limfac(:);
 v = sum(vals);
 
 if nargout > 1
