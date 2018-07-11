@@ -22,15 +22,15 @@ nzpenalty = ones(1, numrounds) .* nzpenalty;
 qbarrier = ones(1, numrounds) .* qbarrier;
 
 % Everything needs to be square and the same dimension
-side2 = size(pattern,1);
-fullsize = numel(pattern);
+[dims, side2, fullsize, pshape, cshape] = getdims(pattern);
+
 pattern = reshape(pattern, fullsize, 1);
 
 opts = tfocs;
 opts.alg = alg;
 
 % Note, the tolerance will be dependent on the accuracy of the (double precision) FFT
-% which essentially sums side2*side2 entries (succession of two side2 sums)
+% which essentially sums side2^dims entries (succession of two side2 sums)
 opts.maxmin = 1;
 opts.restart = 5e5;
 opts.countOps = 1;
@@ -43,14 +43,14 @@ opts.restart = -100000;
 % Change to only 'fun' if your version does not support this.
 opts.autoRestart = 'fun,gra';
 
-mask = [reshape(support, side2, side2, side2) reshape(support, side2, side2, side2) * 0];
+mask = [reshape(support, pshape) reshape(support, pshape) * 0];
 mask = reshape(mask, fullsize * 2,1);
 % Purely real, i.e. zero mask in imaginary space
 ourlinpflat = jackdawlinop(side2,1);
 % No windowing used within linop [for now]
 ourlinp = ourlinpflat;
 
-[factor, basepenalty] = createwindows(side2, fullsize);
+[factor, basepenalty] = createwindows(pattern, mask);
 
 if isempty(initguess)
     initguess = pattern(:) .* factor;
@@ -159,5 +159,5 @@ for outerround=1:numrounds
     end
 end
 
-outpattern = reshape(x,side2,side2);
+outpattern = reshape(x, pshape);
 details = out;
