@@ -31,9 +31,9 @@ for i = 1:100
       break
   end
   if b == 1
-    hi = lo + diff * 2/3;
+    hi = poses(2);
   elseif b == 2
-    lo = lo + diff * 1/3;
+    lo = poses(1);
   end
   if realvals(b) < minval
       minval = realvals(b);
