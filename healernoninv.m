@@ -15,6 +15,8 @@ function [outpattern, details, factor] = healer(pattern, support, bkg, initguess
 
 % Acceleration and continuation adapted to COACS is also used, but hardcoded.
 
+iterfactor = 2;
+
 % Handle scalars
 nzpenalty = ones(1, numrounds) .* nzpenalty;
 qbarrier = ones(1, numrounds) .* qbarrier;
@@ -41,35 +43,14 @@ opts.restart = -100000;
 % Change to only 'fun' if your version does not support this.
 opts.autoRestart = 'fun,gra';
 
-mask = reshape(support, fullsize,1);
+mask = [reshape(support, side2, side2, side2) reshape(support, side2, side2, side2) * 0];
+mask = reshape(mask, fullsize * 2,1);
 % Purely real, i.e. zero mask in imaginary space
-mask = [mask; mask * 0];
 ourlinpflat = jackdawlinop(side2,1);
+% No windowing used within linop [for now]
+ourlinp = ourlinpflat;
 
-global filter
-filter = hann(side2, 'periodic');
-%filter = filter * filter';
-filter = fftshift(filter);
-
-side3 = side2
-
-filter1 = repmat(filter, [1 side2 side2]);
-filter2 = ones(1,side2,1);
-filter2(:) = filter(:);
-filter2 = repmat(filter2, [side2 1 side2]);
-
-filter3 = ones(1,1,side2);
-filter3(:) = filter(:);
-filter3 = repmat(filter3, [side2 side2 1]);
-
-
-
-filter = filter1 .* filter2 .* filter3;
-filter = filter + 1e-3;
-
-global factor
-factor = reshape(filter, fullsize, 1);
-factor = factor .* factor;
+[factor, basepenalty] = createwindows(side2, fullsize);
 
 if isempty(initguess)
     initguess = pattern(:) .* factor;
@@ -81,14 +62,18 @@ xprev = x;
 y = x;
 jval = 0;
 
+
 for outerround=1:numrounds
+    penalty = basepenalty * nzpenalty(outerround);
+
     % Acceleration scheme based on assumption of linear steps in response to decreasing qbarrier
     if outerround > 1 && (qbarrier(outerround) ~= qbarrier(outerround - 1))
         if (jval > 0)
             diffx = x + (x - xprev) .* (qbarrier(outerround) / qbarrier(outerround - 1));
-            diffxt = ourlinpflat(diffx .* filter(:), 2); 
-            smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
-            proxop = zero_tolerant_quad(penalty, -diffxt-level);
+
+            smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter);
+	    [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
+
             y = x + halfboundedlinesearch((x - xprev), @(z) (smoothop(z + (x-diffx)) + proxop(ourlinp(z + (x-diffx), 2))));
         end
         step = norm(y - x)
@@ -98,64 +83,48 @@ for outerround=1:numrounds
     
     xprevinner = y;
     jvalinner = -1;
-    opts.maxIts = ceil(iters(outerround) / 1.01);
+    opts.maxIts = ceil(iters(outerround) / iterfactor);
     while true
       % Static .9 inner acceleration scheme for repeated iterations at the same qbarrier level
       if jvalinner >= 0
-        %x = y + (y - xprevinner) * 0.9;
-        x = y + halfboundedlinesearch((y - xprevinner), @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-diffx), 2))));
+        diffx = y;
+
+        % TODO: Should bkg(:) be included in diffx???
+        smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+	[proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
+        x = y + halfboundedlinesearch((y - xprevinner), @(x) (smoothop(x) + proxop(ourlinp(x - xlevel, 2))));
       else
         x = y;
       end
     xprevinner = y;
 	jvalinner = jvalinner + 1;
-	opts.maxIts = ceil(opts.maxIts * 1.01);
+	opts.maxIts = ceil(opts.maxIts * iterfactor);
     opts.tol = tols(outerround);
-    opts.L0 = 1 ./ qbarrier(outerround);
+    opts.L0 = 0.25 ./ qbarrier(outerround);
     diffx = x;
     
     % No actual filter windowing used, window integrated in the scale in diffpoisson instead
     filter(:) = 1;
     filter = reshape(filter,fullsize,1);    
-    rfilter = 1./filter;       
+    rfilter = 1./filter;  
 
-    global ourlinp
-    ourlinp = jackdawlinop(side2,rfilter);
-  
-    diffxt = ourlinpflat(diffx .* filter(:), 2);
-
-    % Perform Hann windowing on our penalty matrix
-    global penalty;
-    penalty = (reshape((mask(1:fullsize) <= 0) + j * (mask(fullsize + 1:2*fullsize) <= 0),side2,side2,side2));
-    penalty = fftshift(fftn(fftn(fftshift(penalty)) .* reshape(factor,side2,side2,side2))) / fullsize;
-    penalty = [real(penalty) imag(penalty)];
-
-    % Filter out numerical inaccuracies
-    penalty(penalty < 1e-8) = 0;
-
-    penalty = reshape(penalty, 2 * fullsize, 1);
-    penalty = penalty * nzpenalty(outerround);
-
-    % Translate those portions that are not penalized
-    level = -diffxt * 0;
-    level(penalty == 0) = 0;
-          
-    xlevel = ourlinp(level, 1);
     % TODO: Should bkg(:) be included in diffx???
     smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
-    proxop = zero_tolerant_quad(penalty, -diffxt-level);
+    [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
 
+    qbarrier(outerround)
     [x,out] = tfocs({smoothop}, {ourlinp,xlevel}, proxop, -level * 1, opts);
     
     xtupdate = x;
-    x = ourlinp(x,1) + xlevel;
-    xupdate = x;
+    x = ourlinp(x,1);
+    xstep = x;
+    xupdate = x + xlevel;
     oldy = y;
     prevstep = xprevinner - diffx;
     levelprevdiff = norm(prevstep)
-    y = x(:) + diffx(:);
-    y = y + halfboundedlinesearch(x, @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-diffx), 2))));
-    y = y + halfboundedlinesearch(prevstep, @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-diffx), 2))));
+    y = (xupdate(:)) + diffx(:);
+    y = y + halfboundedlinesearch(x, @(x) (smoothop(x + xupdate(:))  + proxop(ourlinp(x + xstep, 2))));
+    %y = y + halfboundedlinesearch(prevstep, @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-(diffx+xlevel)), 2))));
     levelxdiff = norm(xprevinner - y)
     
     % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
@@ -175,9 +144,15 @@ for outerround=1:numrounds
     save x3 x2
 
     % Our step was very small for desired accuracy level, break
-    if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - diffx, 2) - level(:)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:))) /opts.maxIts < 1e-7
+    if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:))) /out.niter < 1e-7
       'Next outer iteration'
         break
+    end
+   
+    if out.niter < opts.maxIts
+        'Reverting maxIts'
+        % We did a lot of restarts, this is new territory
+        opts.maxIts = ceil(iters(outerround) / iterfactor);
     end
 
     % Our change in function value was so small that the numerical accuracy can be in jeopardy
