@@ -62,6 +62,12 @@ xprev = x;
 y = x;
 jval = 0;
 
+				% No actual filter windowing used, window integrated in the scale in diffpoisson instead
+filter(:) = 1;
+filter = reshape(filter,fullsize,1);    
+rfilter = 1./filter;  
+
+
 
 for outerround=1:numrounds
     penalty = basepenalty * nzpenalty(outerround);
@@ -85,7 +91,7 @@ for outerround=1:numrounds
     jvalinner = -1;
     opts.maxIts = ceil(iters(outerround) / iterfactor);
     while true
-      % Static .9 inner acceleration scheme for repeated iterations at the same qbarrier level
+      % Inner acceleration scheme based on overall difference to previous pre-acceleration start
       if jvalinner >= 0
         diffx = y;
 
@@ -103,11 +109,6 @@ for outerround=1:numrounds
     opts.L0 = 0.25 ./ qbarrier(outerround);
     diffx = x;
     
-    % No actual filter windowing used, window integrated in the scale in diffpoisson instead
-    filter(:) = 1;
-    filter = reshape(filter,fullsize,1);    
-    rfilter = 1./filter;  
-
     % TODO: Should bkg(:) be included in diffx???
     smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
     [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
@@ -123,13 +124,13 @@ for outerround=1:numrounds
     prevstep = xprevinner - diffx;
     levelprevdiff = norm(prevstep)
     y = (xupdate(:)) + diffx(:);
+    % Acceleration step continuing in the same direction
     y = y + halfboundedlinesearch(x, @(x) (smoothop(x + xupdate(:))  + proxop(ourlinp(x + xstep, 2))));
-    %y = y + halfboundedlinesearch(prevstep, @(x) (smoothop(x + (y-diffx)) + proxop(ourlinp(x + (y-(diffx+xlevel)), 2))));
     levelxdiff = norm(xprevinner - y)
     
     % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
     % If so, the acceleration step was too large, change to previous starting point and redo.
-    % Otherwise, divergence is a real risk.
+    % Otherwise, divergence is a real risk. This is believed to be a non-issue with the line search scheme now in place.
     if levelprevdiff > levelxdiff
         % Reset acceleration
         %y = xprevinner;
@@ -155,14 +156,6 @@ for outerround=1:numrounds
         opts.maxIts = ceil(iters(outerround) / iterfactor);
     end
 
-    % Our change in function value was so small that the numerical accuracy can be in jeopardy
-    % Within iteration, we are using translation to increase accuracy
-    % Increase number of steps in order to possibly achieve a large enough cnhange
-    %if norm(xupdate) / norm(x) < max(1e-4, sqrt(eps(1) * side2 * side2))
-    if levelxdiff < max(1e-7 * norm(x), sqrt(eps(1) * fullsize))
-        opts.maxIts = opts.maxIts * 2;
-        continue
-    end
     end
 end
 
