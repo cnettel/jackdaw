@@ -28,13 +28,17 @@ xupperlim = x;
 xupperlim(subupper) = upperlim(subupper);
 
 vals = 0 * x;
-absrefpointupperlim = absrefpoint - basey;
-absrefpointupperlim(absrefpointupperlim<upperlim) = upperlim(absrefpointupperlim<upperlim);
-absrefpointupperlim = absrefpointupperlim + basey;
+refpoint = absrefpoint(:) - basey(:);
+refpointupperlim = refpoint;
+refpointupperlim(refpoint<upperlim) = upperlim(refpoint<upperlim);
+absrefpointupperlim = refpointupperlim(:) + basey(:);
 
 % Compute log-poisson difference compared to absrefpoint, and with the log-lambda part capped at xupperlim, rather than true x (which might be less than xupperlim)
 % Beyond xupperlim, extend linearly with the general 1 gradient, and a linear extrapolation of the y * ln(x) term from xupperlim
-vals(mask) = -(y(mask) .* (log((xupperlim(mask) + basey(mask)) ./ max(absrefpointupperlim(mask),0.5e-9))) - 1.*(x(mask)-1*(absrefpoint(mask)-basey(mask))) - (xupperlim(mask) - x(mask)) .* (y(mask) ./ max(xupperlim(mask)+basey(mask),1e-15)) + (absrefpointupperlim(mask) - absrefpoint(mask)) .* (y(mask) ./ max(absrefpointupperlim(mask),1e-15)));
+vals(mask) = -(y(mask) .* (log((xupperlim(mask) + basey(mask)) ./ max(absrefpointupperlim(mask),0.5e-9))) ...
+    - 1.*(x(mask)-1*(absrefpoint(mask)-basey(mask))) ...
+    + (-(xupperlim(mask) - x(mask)) .* (y(mask) ./ max(upperlim(mask)+basey(mask),1e-15)) ...
+       +(refpointupperlim(mask) - refpoint(mask)) .* (y(mask) ./ max(upperlim(mask) + basey(mask),1e-15))));
 
 % Extra debug output
 if nargout > 2
@@ -50,13 +54,13 @@ lim2(~mask) = lim2(~mask) * 0.5;
 % Add quadratic for all low-value elements
 subs = x < xbase + lim2;
 limfac = ones(size(mask));
-limfac(mask) = limfac(mask) + (y(mask)./max(upperlim(mask) + basey(mask),1e-15));
+%limfac(mask) = limfac(mask) + (y(mask)./max(upperlim(mask) + basey(mask),1e-15));
 vals(subs) = vals(subs) + (x(subs).^2).*1./lim2(subs) .* limfac(subs);
 
 % Compensate by quadratic from absrefpoint position, if any
-subs2 = absrefpoint - basey < xbase + lim2;
+subs2 = refpoint < xbase + lim2;
 %vals(subs2) = vals(subs2) - ((absrefpoint(subs2) - basey(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2)) .* limfac(subs2);
-vals(subs2) = vals(subs2) - (absrefpoint(subs2) - basey(subs2)).^2 .* 1./lim2(subs2) .* limfac(subs2);
+vals(subs2) = vals(subs2) - (refpoint(subs2)).^2 .* 1./lim2(subs2) .* limfac(subs2);
 
 subs3 = subs - subs2;
 
