@@ -10,9 +10,8 @@ elseif fullsize == side2^2
   dims = 2
   pshape = [side2 side2];
   cshape = [side2 side2 * 2];
-elseif
+else
   'Unknown dimensionality'
-  break
 end
 
 end

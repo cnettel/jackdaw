@@ -4,23 +4,28 @@ function [factor, basepenalty] = createwindows(pattern, mask)
 
 function [factor] = createfilter(filter, pshape, side2, fullsize)
   shape1 = pshape;
-  shape1(1) = 1;
+  shape1(1) = 1
   filter1 = repmat(filter, shape1);
 
-  filter2 = ones(shape1);
+  shapeb = pshape;
+  shapeb(:) = 1;
+  shapeb(2) = pshape(2);
+  filter2 = ones(shapeb);
   filter2(:) = filter(:);
   shape2 = pshape;
   shape2(2) = 1;
   filter2 = repmat(filter2, shape2);
-  filter = filter1 .* filter2;
+  size(filter1)
+  size(filter2)
+  newfilter = filter1 .* filter2;
 
   if dims == 3
     filter3 = ones(1,1,side2);
     filter3(:) = filter(:);
     filter3 = repmat(filter3, [side2 side2 1]);
-    filter = filter .* filter3;
+    newfilter = newfilter .* filter3;
   end
-  factor = reshape(filter, fullsize, 1);
+  factor = reshape(newfilter, fullsize, 1);
 end
 
 filter = hann(side2, 'periodic');
@@ -62,7 +67,6 @@ filter = fftshift(filter);
 
 factor = createfilter(filter, pshape, side2, fullsize);
 
-filter = filter1 .* filter2 .* filter3;
 factor = factor + 1e-3;
 factor = factor .* factor;
 

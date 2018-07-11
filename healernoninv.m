@@ -24,6 +24,7 @@ qbarrier = ones(1, numrounds) .* qbarrier;
 % Everything needs to be square and the same dimension
 [dims, side2, fullsize, pshape, cshape] = getdims(pattern);
 
+origpattern = pattern;
 pattern = reshape(pattern, fullsize, 1);
 
 opts = tfocs;
@@ -50,7 +51,7 @@ ourlinpflat = jackdawlinop(side2,1);
 % No windowing used within linop [for now]
 ourlinp = ourlinpflat;
 
-[factor, basepenalty] = createwindows(pattern, mask);
+[factor, basepenalty] = createwindows(origpattern, mask);
 
 if isempty(initguess)
     initguess = pattern(:) .* factor;
@@ -63,6 +64,7 @@ y = x;
 jval = 0;
 
 				% No actual filter windowing used, window integrated in the scale in diffpoisson instead
+filter = factor;               
 filter(:) = 1;
 filter = reshape(filter,fullsize,1);    
 rfilter = 1./filter;  
