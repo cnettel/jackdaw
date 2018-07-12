@@ -79,8 +79,8 @@ for outerround=1:numrounds
         if (jval > 0)
             diffx = x + (x - xprev) .* (qbarrier(outerround) / qbarrier(outerround - 1));
 
-            smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter);
-	    [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
+            smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+            [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
 
             y = x + halfboundedlinesearch((x - xprev), @(z) (smoothop(z + (x-diffx)) + proxop(ourlinp(z + (x-diffx), 2))));
         end
@@ -127,7 +127,7 @@ for outerround=1:numrounds
     levelprevdiff = norm(prevstep)
     y = (xupdate(:)) + diffx(:);
     % Acceleration step continuing in the same direction
-    y = y + halfboundedlinesearch(x, @(x) (smoothop(x + xupdate(:))  + proxop(ourlinp(x + xstep, 2))));
+    y = y + halfboundedlinesearch(xupdate, @(x) (smoothop(x + xupdate(:))  + proxop(ourlinp(x + xstep, 2))));
     levelxdiff = norm(xprevinner - y)
     
     % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
@@ -154,8 +154,8 @@ for outerround=1:numrounds
    
     if out.niter < opts.maxIts
         'Reverting maxIts'
-        % We did a lot of restarts, this is new territory
-        opts.maxIts = ceil(iters(outerround) / iterfactor);
+        % We did a lot of restarts, do not extend maxIts just yet.
+        opts.maxIts = ceil(opts.maxIts / iterfactor);
     end
 
     end

@@ -28,7 +28,7 @@ xupperlim = x;
 xupperlim(subupper) = upperlim(subupper);
 
 vals = 0 * x;
-refpoint = absrefpoint(:) - basey(:);
+refpoint = absrefpoint - basey;
 refpointupperlim = refpoint;
 refpointupperlim(refpoint(:)<upperlim(:)) = upperlim(refpoint(:)<upperlim(:));
 absrefpointupperlim = refpointupperlim(:) + basey(:);
@@ -59,8 +59,9 @@ vals(subs) = vals(subs) + (x(subs).^2).*1./lim2(subs) .* limfac(subs);
 
 % Compensate by quadratic from absrefpoint position, if any
 subs2 = refpoint(:) < xbase(:) + lim2(:);
+
 %vals(subs2) = vals(subs2) - ((absrefpoint(subs2) - basey(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2)) .* limfac(subs2);
-vals(subs2) = vals(subs2) - (refpoint(subs2)).^2 .* 1./lim2(subs2) .* limfac(subs2);
+vals(subs2) = vals(subs2) - (refpoint(subs2)).^2 .* (1./lim2(subs2)) .* (limfac(subs2));
 
 subs3 = subs - subs2;
 
