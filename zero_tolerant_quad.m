@@ -1,12 +1,12 @@
-function op = zero_tolerant_quad( P, p2 )
+function op = zero_tolerant_quad( P, p2, p3 )
 
   P = P(:); % make it a column vector
-  op = @(varargin)smooth_quad_diag_matrix( P, p2, varargin{:} );
+  op = @(varargin)smooth_quad_diag_matrix( P, p2, p3, varargin{:} );
   
   
-  function [ v, g ] = smooth_quad_diag_matrix( p, p2, x, t )
+  function [ v, g ] = smooth_quad_diag_matrix( p, p2, p3, origx, t )
     pm = max(p(:));
-    origx = x;
+    x = origx;
     x = x - p2;
     
     % Can be added to make non-negativity constraint
@@ -16,13 +16,15 @@ function op = zero_tolerant_quad( P, p2 )
     x(mask) = origx(mask);
     p2(mask) = 0;
     switch nargin
-      case 3,
-        g = p .* x;
-        v = 0.5 *  tfocs_dot( x, g );
       case 4,
+        g = p .* x;
+        v = 0.5 *  sum( x.*g - p.*p3.*p3 );
+      case 5,
+        prevx = x;
         x = (1./(t*p+1)) .* (x);
-        g = x + p2; % for this case, "g" is NOT the gradient
-        v = 0.5 * tfocs_dot( p.*x , x );
+        
+        g = x + p2; % for this case, "g" is NOT the gradient        
+        v = 0.5 * sum( p.*x .* x - p.*p3.*p3);
 	end
 	
 % Part of Jackdaw by Carl Nettelblad.
