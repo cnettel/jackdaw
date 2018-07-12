@@ -47,7 +47,7 @@ opts.autoRestart = 'fun,gra';
 mask = [reshape(support, pshape) reshape(support, pshape) * 0];
 mask = reshape(mask, fullsize * 2,1);
 % Purely real, i.e. zero mask in imaginary space
-ourlinpflat = jackdawlinop(side2,1);
+ourlinpflat = jackdawlinop(origpattern,1);
 % No windowing used within linop [for now]
 ourlinp = ourlinpflat;
 

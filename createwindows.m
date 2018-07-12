@@ -38,12 +38,17 @@ purefactor = purefactor .* purefactor;
 
 
 				% Perform Hann windowing on our penalty matrix
-maskinshape = reshape(mask, side2, 2 * side2, side2);
-basepenalty = double((maskinshape(1:side2,1:side2,1:side2 )> 0) + ...
+maskinshape = reshape(mask, cshape);
+if dims == 3
+  basepenalty = double((maskinshape(1:side2,1:side2,1:side2 )> 0) + ...
                  1j * (maskinshape(1:side2,side2 + (1:side2), 1:side2) > 0));
+else
+  basepenalty = double((maskinshape(1:side2,1:side2 )> 0) + ...
+                 1j * (maskinshape(1:side2,side2 + (1:side2)) > 0));
+end
 				%basepenalty = double(reshape((mask(1:fullsize) > 0) + 1j * (mask(fullsize + 1:2*fullsize) > 0),side2,side2,side2));
 				%basepenalty = double(mask > 0);
-basepenalty = ifftshift(ifftn(fftn(fftshift(basepenalty)) .* reshape(purefactor,side2,side2,side2)));
+basepenalty = ifftshift(ifftn(fftn(fftshift(basepenalty)) .* reshape(purefactor, pshape)));
 				%basepenalty = ourlinp(ourlinp(basepenalty, 1) .* purefactor, 2);
 
 				% Filter out numerical inaccuracies
