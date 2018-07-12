@@ -6,11 +6,11 @@ tols = [];
 
 % Prepare settings for the different continuation levels
 for i=0:rounds
-  val = 4^-(i - 2);
+  val = 4^-(i - 2)
   qbarrier = [qbarrier val];
-  nzpval = 1e13 / val;
+  nzpval = 1e8;% / val;
   nzpenalty = [nzpenalty nzpval];
-  iters = [iters 3e3];
+  iters = [iters 3e2];
   tolval = val * 1e-14;
   tols = [tols tolval];
 end
