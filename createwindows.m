@@ -66,7 +66,7 @@ basepenalty = reshape(basepenalty, 2 * fullsize, 1);
 
 
 
-filter = hann(side2);
+filter = hann(side2, 'periodic');
 %filter = filter * filter';
 filter = fftshift(filter);
 

@@ -5,7 +5,19 @@ filterrsq = 1./filter.^2;
 baseyscaled = basey .* rscale;
 absrefpointscaled = absrefpoint .* rscale;
 
+lo = ones(size(mask)) * 1;
+hi = lo * 10;
+
+%function v = minipoisson(x, y, limfac)
+
+%for i = 1:100
+%    limfac = 0.5 * (lo + hi);
+    
+%end
+
+
 f = @(varargin)diff_func(scale, rscale,mask,y,baseyscaled, minval, absrefpointscaled, filterrsq, qbarrier, varargin{:});
+
 
 
 
@@ -51,10 +63,14 @@ end
 lim2 = lim;
 lim2(~mask) = lim2(~mask) * 0.5;
 
+
+
 % Add quadratic for all low-value elements
 subs = x(:) < xbase(:) + lim2(:);
 limfac = ones(size(mask));
-%limfac(mask) = limfac(mask) + (y(mask)./max(upperlim(mask) + basey(mask),1e-15));
+%limfac = ones(size(mask)) .* (1+ 1 ./ lim2(:).^1.5);
+%limfac = ones(size(mask)) .* (1+ 3 ./ lim2(:).^1.1);
+limfac(mask) = limfac(mask) + (y(mask)./max(upperlim(mask) + basey(mask),1e-15));
 vals(subs) = vals(subs) + (x(subs).^2).*1./lim2(subs) .* limfac(subs);
 
 % Compensate by quadratic from absrefpoint position, if any

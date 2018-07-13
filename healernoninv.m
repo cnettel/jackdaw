@@ -147,7 +147,10 @@ for outerround=1:numrounds
     save x3 x2
 
     % Our step was very small for desired accuracy level, break
-    if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:))) /out.niter < 1e-7
+    %if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:)))  < 1e-7 / sqrt(qbarrier(outerround))
+    diffstep = xprevinner - y;
+    rchange = norm(diffstep) / norm(pattern .* factor)
+    if rchange < 1e-6 * out.niter
       'Next outer iteration'
         break
     end
