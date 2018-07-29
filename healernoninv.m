@@ -1,4 +1,4 @@
-function [outpattern, details, factor] = healer(pattern, support, bkg, initguess, alg, numrounds, qbarrier, nzpenalty, iters, tols)
+function [outpattern, details, factor] = healer(pattern, support, bkg, initguess, alg, numrounds, qbarrier, nzpenalty, iters, tols, nowindow)
 
 % Main COACS function.
 
@@ -15,7 +15,15 @@ function [outpattern, details, factor] = healer(pattern, support, bkg, initguess
 
 % Acceleration and continuation adapted to COACS is also used, but hardcoded.
 
-iterfactor = 2;
+if nargin < 11
+  nowindow = []
+end
+
+if isempty(nowindow)
+  nowindow = 0;
+end
+
+iterfactor = 1.1;
 
 % Handle scalars
 nzpenalty = ones(1, numrounds) .* nzpenalty;
@@ -51,7 +59,15 @@ ourlinpflat = jackdawlinop(origpattern,1);
 % No windowing used within linop [for now]
 ourlinp = ourlinpflat;
 
-[factor, basepenalty] = createwindows(origpattern, mask);
+global factor
+global basepenalty
+
+if nowindow == 1
+  factor = ones(65536, 1);
+  basepenalty = 1 - mask;
+else
+  [factor, basepenalty] = createwindows(origpattern, mask);
+end
 
 if isempty(initguess)
     initguess = pattern(:) .* factor;
@@ -108,7 +124,9 @@ for outerround=1:numrounds
 	jvalinner = jvalinner + 1;
 	opts.maxIts = ceil(opts.maxIts * iterfactor);
     opts.tol = tols(outerround);
-    opts.L0 = 0.25 ./ qbarrier(outerround);
+    opts.L0 = 2 ./ qbarrier(outerround);
+    opts.Lexact = opts.L0;
+    opts.beta = 1;
     diffx = x;
     
     % TODO: Should bkg(:) be included in diffx???
@@ -149,10 +167,11 @@ for outerround=1:numrounds
     % Our step was very small for desired accuracy level, break
     %if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:)))  < 1e-7 / sqrt(qbarrier(outerround))
     diffstep = xprevinner - y;
-    rchange = norm(diffstep) / norm(pattern .* factor)
-    if rchange < 1e-6 * out.niter
+    rchange = norm(diffstep(pattern >= 0), 1) / norm(pattern(pattern >= 0) .* factor(pattern >= 0), 1)
+    if jvalinner >= 0 && rchange < 1e-6 * out.niter && ...
+            abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:)))  < 1e-4 * out.niter %* sqrt(qbarrier(outerround)) 
       'Next outer iteration'
-        break
+      break        
     end
    
     if out.niter < opts.maxIts

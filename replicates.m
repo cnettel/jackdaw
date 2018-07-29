@@ -1,28 +1,32 @@
 load reference
 
-rounds = 48;
+rounds = 68;
 qbarrier = [];
 nzpenalty = [];
 iters = [];
 tols = [];
+if exist('nowindow') == 0
+  nowindow = [];
+end
 
 % Prepare settings for the different continuation levels
 for i=0:rounds
   val = 2^-(i - 3);
   qbarrier = [qbarrier val];
-  nzpval = 1e8 / val;
+  nzpval = 1e4 / val;
   nzpenalty = [nzpenalty nzpval];
-  iters = [iters 1e2];
+  iters = [iters 6e2];
   tolval = val * 1e-14;
   tols = [tols tolval];
 end
 
-numrep = 1;
+numrep = 50;
 rs = cell(50,256,256);
 vs = cell(50,256,256);
 
+rng(0, 'twister')
 
-for qq2 = 1:50      
+for qq2 = 1:numrep      
   banner = sprintf('##################### PREP REPLICATE %d\n', qq2)
   r2 = poissrnd(r3b);
   r(r>=0) = r2(r>=0);
@@ -35,7 +39,7 @@ parfor qq2 = 1:numrep
   banner = sprintf('##################### REPLICATE %d\n', qq2)
   r = rs{qq2}; 
 tic
-    [v, b] = healernoninv(r, mask, zeros(256,256), [], 'AT', length(qbarrier), qbarrier, nzpenalty, iters, tols);
+    [v, b] = healernoninv(r, mask, zeros(256,256), [], 'AT', length(qbarrier), qbarrier, nzpenalty, iters, tols, nowindow);
 toc
     vs{qq2} = v;
 end
@@ -51,4 +55,3 @@ end
 
 clear rsold vsold
 
-save invicosa72orig -v7.3
