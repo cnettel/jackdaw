@@ -5,16 +5,7 @@ filterrsq = 1./filter.^2;
 baseyscaled = basey .* rscale;
 absrefpointscaled = absrefpoint .* rscale;
 
-lo = ones(size(mask)) * 1;
-hi = lo * 10;
-
-%function v = minipoisson(x, y, limfac)
-
-%for i = 1:100
-%    limfac = 0.5 * (lo + hi);
-    
-%end
-
+%y(mask) = y(mask) + qbarrier * 0.5 .* rscale(mask) .* filterrsq(mask);
 
 f = @(varargin)diff_func(scale, rscale,mask,y,baseyscaled, minval, absrefpointscaled, filterrsq, qbarrier, varargin{:});
 
@@ -23,15 +14,15 @@ f = @(varargin)diff_func(scale, rscale,mask,y,baseyscaled, minval, absrefpointsc
 
 function [v,x,vals] = diff_func(scale, rscale, mask, y, basey, minval, absrefpoint, filterrsq, qbarrier, x)
 
-global x2
-x2 = x;
-
 x = x .* rscale;
 % Rescale limit by scaling to get a low gradient Lipschitz constant everywhere
 lim = qbarrier .* filterrsq .* (rscale .* rscale);
 
 
 % Special treatment occurs between xbase and upperlim
+mask2 = (mask) & (y > 0);
+lim(mask2) = max(lim(mask2), (2 .* lim(mask2) .* y(mask2)).^(1/2));
+
 xbase = -basey + minval - lim ./ 2;
 upperlim = xbase + lim;
 
@@ -52,14 +43,6 @@ vals(mask) = -(y(mask) .* (log((xupperlim(mask) + basey(mask)) ./ max(absrefpoin
     + (-(xupperlim(mask) - x(mask)) .* (y(mask) ./ max(upperlim(mask)+basey(mask),1e-15)) ...
        +(refpointupperlim(mask) - refpoint(mask)) .* (y(mask) ./ max(upperlim(mask) + basey(mask),1e-15))));
 
-% Extra debug output
-if nargout > 2
-    vals2 = x;
-    vals2(:) = 0;
-    vals2(mask) = vals;
-    vals = vals2;
-end
-
 lim2 = lim;
 lim2(~mask) = lim2(~mask) * 0.5;
 
@@ -70,18 +53,19 @@ subs = x(:) < xbase(:) + lim2(:);
 limfac = ones(size(mask));
 %limfac = ones(size(mask)) .* (1+ 1 ./ lim2(:).^1.5);
 %limfac = ones(size(mask)) .* (1+ 3 ./ lim2(:).^1.1);
-limfac(mask) = limfac(mask) + (y(mask)./max(upperlim(mask) + basey(mask),1e-15));
-vals(subs) = vals(subs) + (x(subs).^2).*1./lim2(subs) .* limfac(subs);
+%limfac(mask) = max(limfac(mask), (y(mask)./max(upperlim(mask) + basey(mask),1e-15)));
+limfac = limfac ./ lim2;
+vals(subs) = vals(subs) + (x(subs).^2) .* limfac(subs);
 
 % Compensate by quadratic from absrefpoint position, if any
 subs2 = refpoint(:) < xbase(:) + lim2(:);
 
 %vals(subs2) = vals(subs2) - ((absrefpoint(subs2) - basey(subs2) - xbase(subs2) - lim2(subs2)).^2.*1./lim2(subs2)) .* limfac(subs2);
-vals(subs2) = vals(subs2) - (refpoint(subs2)).^2 .* (1./lim2(subs2)) .* (limfac(subs2));
+vals(subs2) = vals(subs2) - (refpoint(subs2)).^2 .* (limfac(subs2));
 
 subs3 = subs - subs2;
 
-vals(:) = vals(:) + (subs3(:) .* (xbase(:) + lim2(:)).^2 + (-subs(:) .* x(:) + subs2(:) .* (absrefpoint(:) - basey(:))) .* 2 .* (xbase(:) + lim2(:)) ).*1./lim2(:) .* limfac(:);
+vals(:) = vals(:) + (subs3(:) .* (xbase(:) + lim2(:)).^2 + (-subs(:) .* x(:) + subs2(:) .* (absrefpoint(:) - basey(:))) .* 2 .* (xbase(:) + lim2(:)) ) .* limfac(:);
 v = sum(vals);
 
 if nargout > 1
@@ -90,7 +74,7 @@ if nargout > 1
     x(:) = 0;
     x(mask) = -g;
     if any(subs)
-      x(subs) = x(subs) + 2 * (oldx(subs) - xbase(subs) - lim2(subs)).^1 .* (1./lim2(subs).^1) .* limfac(subs);
+      x(subs) = x(subs) + 2 * (oldx(subs) - xbase(subs) - lim2(subs)).^1 .* limfac(subs);
     end
     x = x .* rscale;
 end
