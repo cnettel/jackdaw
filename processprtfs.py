@@ -16,10 +16,10 @@ args = parser.parse_args()
 f = h5py.File(args.phase, 'r+')
 
 recons  = f['real_space_final'][:]
-fourier = f['fourier_space_final'][:]
+#fourier = f['fourier_space_final'][:]
 support = f['support_final'][:]
 rerror  = f['real_error'][:]
-ferror  = f['fourier_error'][:]
+#ferror  = f['fourier_error'][:]
 
 with h5py.File(args.ref, 'r') as reff:
     f2 = np.reshape(reff['f2'][:],(256,256))
