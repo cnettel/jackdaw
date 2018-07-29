@@ -67,12 +67,10 @@ basepenalty = reshape(basepenalty, 2 * fullsize, 1);
 
 
 filter = hann(side2, 'periodic');
-%filter = filter * filter';
 filter = fftshift(filter);
 
 factor = createfilter(filter, pshape, side2, fullsize);
-
-factor = factor + 1e-3;
+factor = factor + 0.25e-3;
 factor = factor .* factor;
 
 end
