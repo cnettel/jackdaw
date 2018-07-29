@@ -21,12 +21,16 @@ python phasing.py --output rs72f2/ --variable rs --f2 --mask --filename invicosa
 mkdir rs72
 python phasing.py --output rs72/ --variable rs --mask --filename invicosa72orig.mat
 
+mkdir rs72f2sh
+python phasingsh.py --output rs72f2sh/ --variable rs --f2 --mask --filename invicosa72orig.mat
+
 python processprtfs.py --phase vs72/phasing.h5 --ref reference.mat
 python processprtfs.py --phase vs72nw/phasing.h5 --ref reference.mat
 python processprtfs.py --phase rs72f2/phasing.h5 --ref reference.mat
+python processprtfs.py --phase rs72f2sh/phasing.h5 --ref reference.mat
 python processprtfs.py --phase rs72/phasing.h5 --ref reference.mat
 
-# Do mosaic and compute R factors in both modes
+# Do mosaic and compute R factors and MSE
 python domosaic.py
 
 # Create more manageable files
