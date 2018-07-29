@@ -53,11 +53,13 @@ R.set_number_of_iterations(niter_total)
 R.set_number_of_outputs_images(2)
 R.set_number_of_outputs_scores(2)
 R.set_initial_support(support_mask=support_mask)
-R.set_support_algorithm("static", number_of_iterations=niter_total, center_image = False)
+for i in range(0,niter_total-1,1000):
+    R.append_support_algorithm("static", number_of_iterations=1000, speckle_heal = True, center_image = False)
 
-R.append_phasing_algorithm("hio", beta_init=beta, beta_final=beta, number_of_iterations=niter_hio, constraints=['enforce_positivity', 'enforce_real'])
-R.append_phasing_algorithm("er",  number_of_iterations=niter_er, constraints=['enforce_positivity', 'enforce_real'])
-
+R.append_phasing_algorithm("hio", beta_init=beta, beta_final=beta, number_of_iterations=niter_hio/2, constraints=['enforce_positivity', 'enforce_real'])
+R.append_phasing_algorithm("er",  number_of_iterations=niter_er/2, constraints=['enforce_positivity', 'enforce_real'])
+R.append_phasing_algorithm("hio", beta_init=beta, beta_final=beta, number_of_iterations=niter_hio/2, constraints=['enforce_positivity', 'enforce_real'])
+R.append_phasing_algorithm("er",  number_of_iterations=niter_er/2, constraints=['enforce_positivity', 'enforce_real'])
 
 # N unique patterns, M reconstructions of each
 N = 50
