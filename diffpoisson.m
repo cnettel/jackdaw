@@ -20,8 +20,10 @@ lim = qbarrier .* filterrsq .* (rscale .* rscale);
 
 
 % Special treatment occurs between xbase and upperlim
-mask2 = (mask) & (y > 0);
-lim(mask2) = max(lim(mask2), (2 .* lim(mask2) .* y(mask2)).^(1/2));
+%mask2 = (mask) & (y > 0);
+mask2 = mask;
+mask2(:) = 1;
+lim(mask2) = max(lim(mask2), (2 .* max(y(mask2), 1e-2) .* lim(mask2)).^(1/2));
 
 xbase = -basey + minval - lim ./ 2;
 upperlim = xbase + lim;

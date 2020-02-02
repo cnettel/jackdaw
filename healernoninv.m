@@ -44,15 +44,15 @@ opts.maxmin = 1;
 opts.restart = 5e5;
 opts.countOps = 1;
 opts.printStopCrit = 1;
-opts.printEvery = 100;
+opts.printEvery = 2500;
 % Use "no regress" restart option
-opts.restart = -100000;
+opts.restart = -10000000;
 % Special hack in our version of TFOCS to accept mode where both
 % objective function and gradient are checked when determining no-regress option
 % Change to only 'fun' if your version does not support this.
-opts.autoRestart = 'fun,gra';
+opts.autoRestart = 'fun';
 
-mask = [reshape(support, pshape) reshape(support, pshape) * 0];
+mask = [reshape(support, pshape)  0 * reshape(support, pshape)];
 mask = reshape(mask, fullsize * 2,1);
 % Purely real, i.e. zero mask in imaginary space
 ourlinpflat = jackdawlinop(origpattern,1);
@@ -62,15 +62,10 @@ ourlinp = ourlinpflat;
 global factor
 global basepenalty
 
-if nowindow == 1
-  factor = ones(65536, 1);
-  basepenalty = 1 - mask;
-else
-  [factor, basepenalty] = createwindows(origpattern, mask);
-end
+
 
 if isempty(initguess)
-    initguess = pattern(:) .* factor;
+    initguess = pattern(:);
     initguess(initguess < 0) = 0;
 end
 
@@ -79,29 +74,70 @@ xprev = x;
 y = x;
 jval = 0;
 
-				% No actual filter windowing used, window integrated in the scale in diffpoisson instead
-filter = factor;               
-filter(:) = 1;
-filter = reshape(filter,fullsize,1);    
+				% No actual filter windowing used, window integrated in the scale in diffpoisson instead              
+filter = ones(fullsize, 1);   
 rfilter = 1./filter;  
 
 
 
 for outerround=1:numrounds
+    if nowindow == 1
+      factor = ones(65536, 1);
+      basepenalty = 1 - mask;
+    else
+    [factor, basepenalty] = createwindows(origpattern, mask, qbarrier(outerround));
+    end
+    
+    y = y .* factor;
+    x = x .* factor;
+
     penalty = basepenalty * nzpenalty(outerround);
 
     % Acceleration scheme based on assumption of linear steps in response to decreasing qbarrier
     if outerround > 1 && (qbarrier(outerround) ~= qbarrier(outerround - 1))
+        xprev = xprev .* factor;
         if (jval > 0)
             diffx = x + (x - xprev) .* (qbarrier(outerround) / qbarrier(outerround - 1));
 
             smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
             [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
 
-            y = x + halfboundedlinesearch((x - xprev), @(z) (smoothop(z + (x-diffx)) + proxop(ourlinp(z + (x-diffx), 2))));
+            	    newstep = ourlinp(x - xprev, 2);
+        negstep = -newstep;
+        negstep(penalty == 0) = 0;
+	    newstep(penalty > 0) = 0;
+        negstep = ourlinp(negstep, 1);
+	    newstep = ourlinp(newstep, 1);
+        y = x;        
+	    y = y + halfboundedlinesearch((newstep), @(z) (smoothop(z + (y-diffx))));
+	    step = norm(y - x)
+        
+        y = y + halfboundedlinesearch(negstep, @(z) (smoothop(z + (y-diffx)) + proxop(ourlinp(z + (y-diffx-xlevel), 2))));
+        step2 = norm(y - x)
+        
+        y = y + halfboundedlinesearch(-negstep, @(z) (smoothop(z + (y-diffx)) + proxop(ourlinp(z + (y-diffx-xlevel), 2))));
+        step3 = norm(y - x)
+        
+            y = y + halfboundedlinesearch((x - xprev), @(z) (smoothop(z + (y-diffx)) + proxop(ourlinp(z + (y-diffx-xlevel), 2))));
+            step4 = norm(y - x)
+            
+             y = y + halfboundedlinesearch(negstep, @(z) (smoothop(z + (y-diffx)) + proxop(ourlinp(z + (y-diffx-xlevel), 2))));
+        step5 = norm(y - x)
+            
+           y = y + halfboundedlinesearch(-negstep, @(z) (smoothop(z + (y-diffx)) + proxop(ourlinp(z + (y-diffx-xlevel), 2))));
+        step6 = norm(y - x)
+        
+        y = y + halfboundedlinesearch((newstep), @(z) (smoothop(z + (y-diffx))));
+	    step7 = norm(y - x)
+        
+        %smoothop2 = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+        %y = y + halfboundedlinesearch((x - xprev), @(z) (smoothop2(z + (y-diffx))));
+        y = y + halfboundedlinesearch((x - xprev), @(z) (smoothop(z + (y-diffx)) + proxop(ourlinp(z + (y-diffx-xlevel), 2))));
+	    step8 = norm(y - x)
+
+
         end
-        step = norm(y - x)
-        xprev = x;
+        xprev = x ./ factor;
         jval = jval + 1;
     end
     
@@ -125,8 +161,9 @@ for outerround=1:numrounds
 	opts.maxIts = ceil(opts.maxIts * iterfactor);
     opts.tol = tols(outerround);
     opts.L0 = 2 ./ qbarrier(outerround);
-    opts.Lexact = opts.L0;
-    opts.beta = 1;
+    opts.Lexact = opts.L0 * sqrt(96*96*96);
+    opts.alpha = 0.1;
+    opts.beta = 0.1;
     diffx = x;
     
     % TODO: Should bkg(:) be included in diffx???
@@ -138,6 +175,7 @@ for outerround=1:numrounds
     
     xtupdate = x;
     x = ourlinp(x,1);
+    xrtnorm = norm(xtupdate - ourlinp(x, 2))
     xstep = x;
     xupdate = x + xlevel;
     oldy = y;
@@ -146,7 +184,28 @@ for outerround=1:numrounds
     y = (xupdate(:)) + diffx(:);
     % Acceleration step continuing in the same direction
     y = y + halfboundedlinesearch(xupdate, @(x) (smoothop(x + xupdate(:))  + proxop(ourlinp(x + xstep, 2))));
+    smoothop(y - diffx(:))
+    pstep = proxop(ourlinp(y - (diffx(:) + xlevel(:)), 2))
+    
+    smoothop(0 * diffx(:))
+    proxop(ourlinp(-xlevel(:), 2))
+    proxop(-level)       
+    
+    olddiffx = diffx;
+    diffx = y;        
+    
+    normdiff1 = norm(ourlinp(level(:), 1) - xlevel(:))
+    normdiff2 = norm(level(:) + ourlinp(-xlevel(:), 2))
+    norm(level(:))
+    smoothop = diffpoisson(factor, pattern(:), diffx(:), bkg(:), diffx, filter, qbarrier(outerround));
+            [proxop, diffxt, level, xlevel] = createproxop(diffx, penalty, ourlinp);
     levelxdiff = norm(xprevinner - y)
+    
+    smoothop(olddiffx(:) - diffx(:))
+    proxop(ourlinp(olddiffx(:) - (diffx(:) + xlevel(:)), 2))
+    
+    smoothop(0 * diffx(:))
+    proxop(ourlinp(-xlevel(:), 2))
     
     % Is the distance to the new point from the previous end point, shorter than from the previous end point to the starting point?
     % If so, the acceleration step was too large, change to previous starting point and redo.
@@ -156,22 +215,31 @@ for outerround=1:numrounds
         %y = xprevinner;
         'Do we need to reset acceleration?'
         %continue
-    end
+    end           
     
     x = y;
 
     global x2;
-    x2 = x;
-    save x3 x2
+    x2 = x ./ factor;
+    save x26 x2
 
     % Our step was very small for desired accuracy level, break
     %if abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:)))  < 1e-7 / sqrt(qbarrier(outerround))
     diffstep = xprevinner - y;
     rchange = norm(diffstep(pattern >= 0), 1) / norm(pattern(pattern >= 0) .* factor(pattern >= 0), 1)
-    if jvalinner >= 0 && rchange < 1e-6 * out.niter && ...
-            abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:)))  < 1e-4 * out.niter %* sqrt(qbarrier(outerround)) 
+    if pstep > 0
+        'Penalty too low, saddle point circus'      
+        break;
+    end
+    
+    if jvalinner >= 0 && rchange < 5e-9 * out.niter && ...
+            abs(smoothop(y - diffx) - smoothop(xprevinner(:) - diffx(:)) + proxop(ourlinp(y - (diffx + xlevel), 2)) - proxop(ourlinp(xprevinner(:), 2) - diffxt(:) - level(:)))  < 1e-6 %* sqrt(qbarrier(outerround)) 
       'Next outer iteration'
       break        
+    end
+    if jvalinner > 20
+        'Going next anyway'
+        break
     end
    
     if out.niter < opts.maxIts
@@ -179,8 +247,13 @@ for outerround=1:numrounds
         % We did a lot of restarts, do not extend maxIts just yet.
         opts.maxIts = ceil(opts.maxIts / iterfactor);
     end
-
+    if outerround < numrounds && qbarrier(outerround) == qbarrier(outerround + 1)
+        'Not final iter, moving on'
+        break
     end
+    end
+    y = y ./ factor;
+    x = x ./ factor;
 end
 
 outpattern = reshape(x, pshape);

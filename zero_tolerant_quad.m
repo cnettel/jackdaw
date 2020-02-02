@@ -11,21 +11,24 @@ function op = zero_tolerant_quad( P, p2, p3 )
     
     % Can be added to make non-negativity constraint
     % Desn't jive well with Hann windowing
-    %p(x<0) = pm;
+    p4 = p;
+    p4(p3 < 0) = pm;
+    p(x<0) = pm;
     mask = p == 0;
     x(mask) = origx(mask);
     p2(mask) = 0;
     switch nargin
       case 4,
         g = p .* x;
-        v = 0.5 *  sum( x.*g - p.*p3.*p3 );
+        v = 0.5 *  sum( x.*g - p4.*p3.*p3 );
       case 5,
         prevx = x;
         x = (1./(t*p+1)) .* (x);
         
         g = x + p2; % for this case, "g" is NOT the gradient        
-        v = 0.5 * sum( p.*x .* x - p.*p3.*p3);
-	end
+        v = 0.5 * sum( p.*x .* x - p4.*p3.*p3);
+    end
+    
 	
 % Part of Jackdaw by Carl Nettelblad.
 

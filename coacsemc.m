@@ -1,19 +1,26 @@
-rounds = 24;
+rounds = 16;
 qbarrier = [];
 nzpenalty = [];
 iters = [];
 tols = [];
 
+step = 1;
+
 % Prepare settings for the different continuation levels
 for i=0:rounds
-  val = 4^-(i - 2)
-  qbarrier = [qbarrier val];
-  nzpval = 1e8;% / val;
-  nzpenalty = [nzpenalty nzpval];
-  iters = [iters 3e2];
-  tolval = val * 1e-14;
-  tols = [tols tolval];
+  step = step + i;
+  val = 2^-(step - 4);
+  qbarrier = [qbarrier val val];
+  nzpval = 1e4 / sqrt(val);
+  nzpenalty = [nzpenalty nzpval nzpval];
+  iters = [iters 250 1e5];
+  tolval = 1e-7;
+  tols = [tols tolval tolval];
 end
+
+nzpenalty(:) = 1e15;
+nzpenalty(1) = 1000;
+
 
 rs = []
 vs = []

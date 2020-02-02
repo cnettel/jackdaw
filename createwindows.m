@@ -1,4 +1,4 @@
-function [factor, basepenalty] = createwindows(pattern, mask)
+function [factor, basepenalty] = createwindows(pattern, mask, qbarrier)
 
 [dims, side2, fullsize, pshape, cshape] = getdims(pattern);
 
@@ -66,11 +66,21 @@ basepenalty = reshape(basepenalty, 2 * fullsize, 1);
 
 
 
-filter = hann(side2, 'periodic');
+filter = hann(side2);
 filter = fftshift(filter);
 
-factor = createfilter(filter, pshape, side2, fullsize);
-factor = factor + 0.25e-3;
-factor = factor .* factor;
+factor = createfilter(filter, pshape, side2, fullsize);;
+
+% vals = -side2/2+0.5:1:side2/2-0.5;
+% vals = fftshift(vals);
+% 
+% [Xs, Ys, Zs] = meshgrid(vals);
+% r = sqrt(Xs.^2+Ys.^2+Zs.^2);
+% r = min(r,(side2+0)/2);
+% factor = 0.5 * (1 - cos(acos(-1) * 2 * (r/(side2+0) + 0.5)));
+% factor = factor .^ 3;
+
+factor = factor .* factor + 0 * 1e-8; %+ qbarrier ^ 0.25;
+factor = factor(:);
 
 end
